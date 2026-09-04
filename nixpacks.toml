@@ -1,0 +1,12 @@
+# Railway builds with Nixpacks. Node 20+ is required for the server's ESM setup.
+[phases.setup]
+nixPkgs = ["nodejs_22"]
+
+[phases.install]
+cmds = ["npm install"]
+
+[phases.build]
+cmds = ["npm run build"]
+
+[start]
+cmd = "npm start"
