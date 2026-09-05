@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth, isManagerial } from './lib/auth';
 import { ThemeProvider } from './lib/theme';
+import { I18nProvider } from './lib/i18n';
 import { ConnectionProvider } from './lib/connection';
 import { ToastProvider } from './components/Toast';
 import { Skeleton } from './components/Layout';
@@ -63,16 +64,18 @@ function Shell() {
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <ToastProvider>
-        <BrowserRouter>
-          <AuthProvider>
-            <ConnectionProvider>
-              <Shell />
-            </ConnectionProvider>
-          </AuthProvider>
-        </BrowserRouter>
-      </ToastProvider>
-    </ThemeProvider>
+    <I18nProvider>
+      <ThemeProvider>
+        <ToastProvider>
+          <BrowserRouter>
+            <AuthProvider>
+              <ConnectionProvider>
+                <Shell />
+              </ConnectionProvider>
+            </AuthProvider>
+          </BrowserRouter>
+        </ToastProvider>
+      </ThemeProvider>
+    </I18nProvider>
   );
 }

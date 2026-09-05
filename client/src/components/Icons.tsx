@@ -52,5 +52,7 @@ export const IconSun = svg(<><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12
 export const IconShare = svg(<><path d="M12 15V4M8.5 7.5 12 4l3.5 3.5" /><path d="M5 13v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5" /></>);
 export const IconPen = svg(<><path d="M3 20h4L20 7a2.5 2.5 0 0 0-3.5-3.5L3 16.5z" /><path d="M15 5.5 18.5 9" /></>);
 export const IconInbox = svg(<><path d="M4 13h4l1.5 3h5L16 13h4" /><path d="M5.5 5h13l1.5 8v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-4z" /></>);
+export const IconTable = svg(<><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 10h18M9 10v9" /></>);
+export const IconGlobe = svg(<><circle cx="12" cy="12" r="9" /><path d="M3 12h18" /><path d="M12 3c2.5 2.6 3.8 5.7 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.7-3.8-9s1.3-6.4 3.8-9z" /></>);
 export const IconTarget = svg(<><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="4" /><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" /></>);
 export const IconTag = svg(<><path d="M3 12V5a2 2 0 0 1 2-2h7l9 9-9 9z" /><circle cx="8" cy="8" r="1.5" /></>);

@@ -1,49 +1,51 @@
 import { Screen } from '../components/Layout';
 import { useAuth } from '../lib/auth';
-import { roleLabel } from '../lib/format';
+import { roleKey, useT } from '../lib/i18n';
 
 export default function About() {
   const { user } = useAuth();
+  const t = useT();
 
   return (
-    <Screen title="About" back>
+    <Screen title={t('about')} back>
       <div className="card" style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--brand)' }}>EliaVit</div>
-        <p className="muted" style={{ marginTop: 6 }}>Pharmaceutical field-sales record app</p>
-        <p className="muted" style={{ fontSize: 12.5 }}>Version 1.0.0 · prototype</p>
+        <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--brand)' }}>{t('appName')}</div>
+        <p className="muted" style={{ marginTop: 6 }}>{t('aboutTagline')}</p>
+        <p className="muted" style={{ fontSize: 12.5 }}>{t('aboutVersion')}</p>
       </div>
 
-      <div className="section-title">What it does</div>
+      <div className="section-title">{t('whatItDoes')}</div>
       <div className="card">
-        <p style={{ marginTop: 0 }}>
-          Medical representatives record orders, returns, bonuses, expenses, collected money,
-          visits and calls from the field. Team leaders and the general sales manager see the same
-          records rolled up per staff member, zone, company and product.
-        </p>
+        <p style={{ marginTop: 0 }}>{t('aboutBody')}</p>
         <p style={{ marginBottom: 0 }}>
-          You are signed in as <strong>{user?.name}</strong> ({roleLabel(user?.role || '')}), so you
-          can see {user?.role === 'rep' ? 'your own records' : user?.role === 'supervisor' ? 'your team’s records' : 'every record in the company'}.
+          {t('aboutSignedInAs', {
+            name: user?.name || '',
+            role: t(roleKey(user?.role || '')),
+            scope: t(
+              user?.role === 'rep' ? 'scopeOwn' : user?.role === 'supervisor' ? 'scopeTeam' : 'scopeAll',
+            ),
+          })}
         </p>
       </div>
 
-      <div className="section-title">Roles</div>
+      <div className="section-title">{t('roles')}</div>
       <div className="list">
         <div className="row" style={{ display: 'block' }}>
-          <strong>Medical Representative</strong>
+          <strong>{t('roleRep')}</strong>
           <div className="muted" style={{ fontSize: 13, marginTop: 3 }}>
-            Records their own sales activity and manages their own customer list.
+            {t('roleRepText')}
           </div>
         </div>
         <div className="row" style={{ display: 'block' }}>
-          <strong>Team Leader</strong>
+          <strong>{t('roleSupervisor')}</strong>
           <div className="muted" style={{ fontSize: 13, marginTop: 3 }}>
-            Sees their own work plus every representative reporting to them.
+            {t('roleSupervisorText')}
           </div>
         </div>
         <div className="row" style={{ display: 'block' }}>
-          <strong>General Sales Manager</strong>
+          <strong>{t('roleManager')}</strong>
           <div className="muted" style={{ fontSize: 13, marginTop: 3 }}>
-            Sees the whole company: all staff, all zones, all products.
+            {t('roleManagerText')}
           </div>
         </div>
       </div>

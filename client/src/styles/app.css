@@ -26,6 +26,7 @@
   /* Data-viz + status. Validated light set: #6C4CF1 #16A06A #EDA100 #C1272D */
   --viz-accent: #6c4cf1;
   --viz-track: #ddd4fb;
+  --viz-context: #b9a9f5;
   --good: #16a06a;
   --good-bg: #e4f5ee;
   --warn: #eda100;
@@ -38,6 +39,9 @@
   --radius-lg: 22px;
   --shadow-1: 0 1px 2px rgba(29, 26, 43, 0.05), 0 4px 16px rgba(48, 30, 120, 0.06);
   --shadow-2: 0 8px 30px rgba(48, 30, 120, 0.13);
+
+  --font-latin: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-arabic: 'Noto Sans Arabic', 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
 
   --header-h: 54px;
   --tabbar-h: 58px;
@@ -72,6 +76,7 @@
     /* Validated dark set: #9085E9 #199E70 #C98500 #DE4A6B */
     --viz-accent: #9085e9;
     --viz-track: #37326a;
+    --viz-context: #554f96;
     --good: #199e70;
     --good-bg: #14312a;
     --warn: #c98500;
@@ -105,6 +110,7 @@
 
   --viz-accent: #9085e9;
   --viz-track: #37326a;
+  --viz-context: #554f96;
   --good: #199e70;
   --good-bg: #14312a;
   --warn: #c98500;
@@ -116,6 +122,36 @@
   --shadow-2: 0 8px 30px rgba(0, 0, 0, 0.45);
 }
 
+:root:lang(ar), :root:lang(ckb) { --font-latin: var(--font-arabic); }
+:root:lang(ar) body, :root:lang(ckb) body { line-height: 1.6; }
+
+/* ---------------------- right-to-left ---------------------- */
+
+[dir='rtl'] .row .sub,
+[dir='rtl'] .row .title,
+[dir='rtl'] .stat .label,
+[dir='rtl'] .meter-note { text-align: right; }
+
+[dir='rtl'] .drawer { right: 0; left: auto; animation-name: slide-rtl; }
+@keyframes slide-rtl { from { transform: translateX(100%); } to { transform: none; } }
+
+[dir='rtl'] .search-wrap .control { padding-left: 13px; padding-right: 40px; }
+[dir='rtl'] .search-wrap .icon { left: auto; right: 12px; }
+
+[dir='rtl'] select.control {
+  background-position: 18px 50%, 13px 50%;
+  padding-right: 13px;
+  padding-left: 34px;
+}
+
+
+[dir='rtl'] .field > label { margin: 0 3px 6px 0; }
+[dir='rtl'] .hero-figure span { margin-left: 0; margin-right: 6px; }
+
+/* Latin identifiers (ORD-0001, phone numbers, 36.19, 44.00) must stay
+   left-to-right even inside a right-to-left sentence. */
+.ltr-text { direction: ltr; unicode-bidi: isolate; display: inline-block; }
+
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; }
 
@@ -123,7 +159,7 @@ body {
   margin: 0;
   background: var(--ground);
   color: var(--ink);
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+  font-family: var(--font-latin);
   font-size: 15px;
   line-height: 1.45;
   -webkit-font-smoothing: antialiased;
@@ -259,13 +295,14 @@ input, select, textarea { font-size: 16px; }
   overflow: hidden;
 }
 .meter-fill { height: 100%; border-radius: 999px; transition: width 0.5s cubic-bezier(0.2, 0.8, 0.3, 1); }
+.meter-track { display: flex; }
 .meter-fill.on-track { background: var(--viz-accent); }
 .meter-fill.ahead { background: var(--good); }
 .meter-fill.behind { background: var(--warn); }
 .meter-fill.at-risk { background: var(--danger); }
 /* Where the month is up to — shows pace, not just attainment. */
 .meter-pace {
-  position: absolute; top: -3px; bottom: -3px; width: 2px;
+  position: absolute; top: -3px; bottom: -3px; width: 2px; inset-inline-start: 0;
   background: var(--ink-soft); opacity: 0.55; border-radius: 2px;
 }
 .meter-note { margin-top: 6px; font-size: 11.5px; color: var(--ink-soft); }
@@ -603,3 +640,21 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .install-hint .body { flex: 1; font-size: 13px; }
 .install-hint strong { display: block; margin-bottom: 3px; }
 .install-hint .close { background: none; border: 0; color: var(--ink-faint); cursor: pointer; padding: 0; }
+
+/* ---------------------------- ranked bars ------------------------------- */
+
+.bars { display: flex; flex-direction: column; gap: 12px; }
+.bar-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 13px; }
+.bar-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.bar-value { font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.bar-track {
+  display: flex; height: 9px; margin-top: 6px;
+  background: var(--viz-track); border-radius: 999px; overflow: hidden;
+}
+.bar-fill {
+  height: 100%; border-radius: 999px; background: var(--viz-context);
+  transition: width 0.45s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+/* The leader is the emphasis mark; the rest stay in the context tone. */
+.bar-fill.lead { background: var(--viz-accent); }
+.bar-fill.negative { background: var(--danger); }

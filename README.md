@@ -21,6 +21,55 @@ signal, and deploys as a single service on Railway.
 Visibility is enforced on the server (`visibleUserIds` in `server/auth.js`), not
 in the UI, so a rep cannot read another rep's data by calling the API directly.
 
+## Languages
+
+The app ships in three languages and switches instantly — from the login screen
+(before signing in), the side menu, or Profile → Language. The choice is
+remembered on the phone, and a first-time visitor gets their browser's language
+automatically.
+
+| Language | Script | Direction |
+|---|---|---|
+| English | Latin | left-to-right |
+| کوردی (Sorani Kurdish) | Arabic | right-to-left |
+| العربية (Arabic) | Arabic | right-to-left |
+
+Right-to-left is a real layout mirror, not a text swap: the drawer opens from
+the right, the tab bar reverses, the back arrow flips, dropdown carets and the
+search icon move, and the target meter fills from the reading edge with the
+pace marker mirrored with it.
+
+Two deliberate exceptions stay left-to-right in every language, because
+mirroring them causes misreadings rather than preventing them:
+
+- **The trend chart.** Time runs left-to-right on the axis. A mirrored time
+  axis is a well-known way to make people read a rise as a fall.
+- **Digits.** Figures use Latin numerals in all three languages. Arabic and
+  Sorani would otherwise render Arabic-Indic numerals, and a sales app whose
+  numbers change shape between the screen, the CSV and Excel invites costly
+  mistakes. Identifiers like `ORD-0007` and phone numbers are bidi-isolated so
+  they never scramble inside a right-to-left sentence.
+
+**A note on the translations:** they were written to be accurate and idiomatic
+for pharmaceutical field sales in Iraq and the Kurdistan Region, but they have
+not been reviewed by a native speaker. Have a Kurdish and an Arabic speaker on
+your team read through the app once before it goes to real reps — terminology
+for things like *bonus*, *collection* and *promotion* varies between companies,
+and those words should match what your team already says. Every string lives in
+`client/src/locales/`, one file per language, so corrections are a text edit.
+
+## Typography
+
+- **Inter** for Latin text.
+- **Noto Sans Arabic** for Arabic and Sorani Kurdish, which share the Arabic
+  script. It is listed as a fallback in every language, so an Arabic-script
+  customer name inside an English screen still renders properly.
+
+Both are self-hosted and only the subsets the app actually renders are bundled
+(9 font files, not the 100-plus that shipping every Cyrillic, Greek and
+Vietnamese face would cost). Nothing is fetched from a third party, and the
+service worker precaches the fonts so typography survives going offline.
+
 ## On iPhone
 
 The app is designed for the phone first and installs like a native one.
@@ -70,7 +119,8 @@ reception. The app is built for that:
 - **Orders list** — everything recorded, filterable by orders / returns.
 - **Sales Report** — filter by staff, order type, customer type, company, zone,
   customer, product and date range, then view it grouped **by product** or
-  **by order**. Export the result as CSV, straight into the iOS share sheet.
+  **by order**, as **charts or a table**. Export to **Excel or CSV**, straight
+  into the iOS share sheet.
 - **Team Activity** — for leaders and managers: net sales, orders, money
   collected, expenses, visits and calls per staff member over a date range, each
   with a target meter. Leaders and managers set each rep's **monthly target**
@@ -150,8 +200,9 @@ client/
   public/           PWA manifest, service worker, app icons
   src/pages/        One file per screen
   src/components/   App bar, drawer, tab bar, charts, sheets, toasts, signature pad
-  src/lib/          Typed API client, offline queue, auth, theme, CSV export
-  src/styles/       Design tokens (light + dark) and component styles
+  src/lib/          Typed API client, offline queue, auth, theme, i18n, xlsx/CSV export
+  src/locales/      en.ts, ckb.ts, ar.ts — one file per language
+  src/styles/       Design tokens (light + dark), fonts, component styles
 ```
 
 ## API
@@ -174,6 +225,36 @@ All endpoints are under `/api` and need `Authorization: Bearer <token>` except
 | GET/POST/PUT/DELETE | `/orders` | Orders and returns |
 | GET/POST/PUT/DELETE | `/expenses`, `/collections`, `/visits`, `/calls` | Field records |
 | GET | `/products`, `/companies`, `/zones`, `/promotions`, `/staff` | Reference data |
+
+## The sales report
+
+The report is the screen a manager lives in, so it does more than list rows.
+
+**Filters:** staff, order type, customer type, company, zone, customer, product,
+report type (by product or by order) and a date range.
+
+**Charts** (the default view; a Table toggle shows the raw rows):
+
+- **Net sales, last 6 months** — a column chart with the selected month emphasised.
+- **Orders against returns** — the two totals side by side, with the return rate
+  as a percentage.
+- **Top products by value** — ranked horizontal bars, the leader emphasised.
+- **Sales by zone** and **Sales by customer type** — the same ranked bars, on the
+  by-order report.
+
+**Export** — the Export button offers two formats, and both contain exactly the
+rows on screen with the current filters applied, in the current language:
+
+- **Excel (.xlsx)** — a real workbook with two sheets: `Report` (the rows) and
+  `Summary` (the filters used and the headline totals). The header row is bold
+  and frozen, columns are sized to their content, and **numbers are written as
+  numbers**, so Excel totals and pivots them without a "convert to number" pass.
+- **CSV** — UTF-8 with a byte-order mark, so Kurdish and Arabic text opens
+  correctly in Excel rather than as mojibake.
+
+The workbook is generated on the phone by `client/src/lib/xlsx.ts` — an .xlsx
+file is a zip of XML parts, so it writes the handful Excel needs rather than
+bundling a spreadsheet library that a rep would pay for on every app load.
 
 ## Charts and colour
 
@@ -198,6 +279,9 @@ there is no legend to read.
   Postgres (Railway provides one in a click).
 - Tokens are HMAC-signed and expire after 12 hours; passwords are hashed with
   scrypt. There is no password reset flow yet.
+- English is the source language and every other locale is typed against it, so
+  a missing or misspelled key fails the build rather than showing a raw key to a
+  rep in the field.
 - Signatures are stored as small PNG data URLs on the order, capped at 64 KB.
   With many signed orders this is another reason to move to a real database.
 - Visit check-ins trust the phone's reported position. That is fine as a record

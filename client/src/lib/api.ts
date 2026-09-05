@@ -98,10 +98,17 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Thrown when a write could not reach the server and was parked on the phone.
+ * It carries a translation key rather than a sentence: this layer has no access
+ * to the active language.
+ */
 export class OfflineQueuedError extends Error {
-  constructor(message: string) {
-    super(message);
+  labelKey: string;
+  constructor(labelKey: string) {
+    super(`queued:${labelKey}`);
     this.name = 'OfflineQueuedError';
+    this.labelKey = labelKey;
   }
 }
 
@@ -133,15 +140,15 @@ async function request<T>(path: string, options: RequestInit = {}, label?: strin
     // A write we cannot deliver is parked rather than lost; a read just fails.
     if (isWrite && label) {
       enqueue({ path, method, body: String(options.body || ''), label });
-      throw new OfflineQueuedError(`Saved on this phone — ${label} will sync when you are back online`);
+      throw new OfflineQueuedError(label);
     }
-    throw new ApiError('No connection', 0, networkError instanceof Error ? networkError : undefined);
+    throw new ApiError('noConnection', 0, networkError instanceof Error ? networkError : undefined);
   }
 
   if (response.status === 401) {
     clearToken();
     if (!location.pathname.startsWith('/login')) location.assign('/login');
-    throw new ApiError('Session expired, please sign in again', 401);
+    throw new ApiError('sessionExpired', 401);
   }
   if (response.status === 204) return undefined as T;
 
@@ -196,7 +203,7 @@ export const api = {
 
   customers: (params: Params = {}) => request<Customer[]>(`/customers${query(params)}`),
   createCustomer: (body: Partial<Customer>) =>
-    request<Customer>('/customers', { method: 'POST', body: JSON.stringify(body) }, 'new customer'),
+    request<Customer>('/customers', { method: 'POST', body: JSON.stringify(body) }, 'queueCustomer'),
   updateCustomer: (id: number, body: Partial<Customer>) =>
     request<Customer>(`/customers/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   deleteCustomer: (id: number) => request<void>(`/customers/${id}`, { method: 'DELETE' }),
@@ -204,29 +211,29 @@ export const api = {
   orders: (params: Params = {}) => request<Order[]>(`/orders${query(params)}`),
   order: (id: number) => request<Order>(`/orders/${id}`),
   createOrder: (body: unknown) =>
-    request<Order>('/orders', { method: 'POST', body: JSON.stringify(body) }, 'order'),
+    request<Order>('/orders', { method: 'POST', body: JSON.stringify(body) }, 'queueOrder'),
   deleteOrder: (id: number) => request<void>(`/orders/${id}`, { method: 'DELETE' }),
 
   expenses: (params: Params = {}) => request<Expense[]>(`/expenses${query(params)}`),
   createExpense: (body: unknown) =>
-    request<Expense>('/expenses', { method: 'POST', body: JSON.stringify(body) }, 'expense'),
+    request<Expense>('/expenses', { method: 'POST', body: JSON.stringify(body) }, 'queueExpense'),
   deleteExpense: (id: number) => request<void>(`/expenses/${id}`, { method: 'DELETE' }),
 
   collections: (params: Params = {}) => request<Collection[]>(`/collections${query(params)}`),
   createCollection: (body: unknown) =>
-    request<Collection>('/collections', { method: 'POST', body: JSON.stringify(body) }, 'collection'),
+    request<Collection>('/collections', { method: 'POST', body: JSON.stringify(body) }, 'queueCollection'),
   deleteCollection: (id: number) => request<void>(`/collections/${id}`, { method: 'DELETE' }),
 
   visits: (params: Params = {}) => request<Visit[]>(`/visits${query(params)}`),
   createVisit: (body: unknown) =>
-    request<Visit>('/visits', { method: 'POST', body: JSON.stringify(body) }, 'visit'),
+    request<Visit>('/visits', { method: 'POST', body: JSON.stringify(body) }, 'queueVisit'),
   updateVisit: (id: number, body: unknown) =>
     request<Visit>(`/visits/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   deleteVisit: (id: number) => request<void>(`/visits/${id}`, { method: 'DELETE' }),
 
   calls: (params: Params = {}) => request<Call[]>(`/calls${query(params)}`),
   createCall: (body: unknown) =>
-    request<Call>('/calls', { method: 'POST', body: JSON.stringify(body) }, 'call'),
+    request<Call>('/calls', { method: 'POST', body: JSON.stringify(body) }, 'queueCall'),
   deleteCall: (id: number) => request<void>(`/calls/${id}`, { method: 'DELETE' }),
 
   dashboard: () => request<Dashboard>('/dashboard'),
@@ -234,9 +241,9 @@ export const api = {
   leaderboard: (params: Params = {}) =>
     request<{ from: string; to: string; rows: LeaderboardRow[] }>(`/leaderboard${query(params)}`),
   setTarget: (userId: number, target: number) =>
-    request<User>(`/users/${userId}/target`, { method: 'PUT', body: JSON.stringify({ target }) }, 'target'),
+    request<User>(`/users/${userId}/target`, { method: 'PUT', body: JSON.stringify({ target }) }, 'queueTarget'),
   checkIn: (visitId: number, position: { lat?: number; lng?: number; accuracy?: number }) =>
-    request<Visit>(`/visits/${visitId}/checkin`, { method: 'POST', body: JSON.stringify(position) }, 'visit check-in'),
+    request<Visit>(`/visits/${visitId}/checkin`, { method: 'POST', body: JSON.stringify(position) }, 'queueCheckIn'),
   salesReport: (params: Params) => request<SalesReport>(`/sales${query(params)}`),
   team: (params: Params = {}) =>
     request<{ from: string; to: string; pace: number; members: TeamMember[] }>(`/team${query(params)}`),

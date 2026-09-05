@@ -16,6 +16,7 @@ export interface QueuedWrite {
   path: string;
   method: string;
   body: string;
+  /** Translation key naming what was queued, e.g. 'queueOrder'. */
   label: string;
   queuedAt: string;
 }

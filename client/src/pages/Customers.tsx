@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, type Customer, type Zone } from '../lib/api';
 import { initials } from '../lib/format';
+import { customerTypeKey, useT, type TranslateKey } from '../lib/i18n';
 import { Empty, Screen, Skeleton } from '../components/Layout';
 import { ConfirmSheet, Sheet } from '../components/Sheet';
 import { useToast } from '../components/Toast';
@@ -10,6 +11,7 @@ import { IconPin, IconPlus, IconSearch, IconTrash, IconUsers } from '../componen
 const types = ['pharmacy', 'doctor', 'hospital', 'store'];
 
 export default function Customers() {
+  const t = useT();
   const toast = useToast();
   const [customers, setCustomers] = useState<Customer[] | null>(null);
   const [zones, setZones] = useState<Zone[]>([]);
@@ -45,7 +47,7 @@ export default function Customers() {
   /** Pin the customer where the rep is standing, so visit check-ins can verify. */
   function pinHere() {
     if (!navigator.geolocation) {
-      toast('This device cannot share a location', 'error');
+      toast(t('noLocationSupport'), 'error');
       return;
     }
     setLocating(true);
@@ -53,11 +55,11 @@ export default function Customers() {
       (position) => {
         setPinned({ lat: position.coords.latitude, lng: position.coords.longitude });
         setLocating(false);
-        toast('Location pinned');
+        toast(t('locationPinned'));
       },
       () => {
         setLocating(false);
-        toast('Could not get your location', 'error');
+        toast(t('couldNotGetLocation'), 'error');
       },
       { enableHighAccuracy: true, timeout: 8000 },
     );
@@ -74,15 +76,15 @@ export default function Customers() {
       });
       resetForm();
       setAdding(false);
-      toast('Customer added');
+      toast(t('customerAdded'));
       await reload();
     } catch (err) {
       if (err instanceof OfflineQueuedError) {
         resetForm();
         setAdding(false);
-        toast(err.message, 'info');
+        toast(t('savedOnPhone', { label: t(err.labelKey as TranslateKey) }), 'info');
       } else {
-        toast(err instanceof Error ? err.message : 'Could not save the customer', 'error');
+        toast(err instanceof Error ? err.message : t('couldNotSave'), 'error');
       }
     } finally {
       setSaving(false);
@@ -95,10 +97,10 @@ export default function Customers() {
     try {
       await api.deleteCustomer(confirming.id);
       setConfirming(null);
-      toast('Customer removed');
+      toast(t('customerRemoved'));
       await reload();
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Could not remove', 'error');
+      toast(t('couldNotDelete'), 'error');
     } finally {
       setSaving(false);
     }
@@ -106,9 +108,9 @@ export default function Customers() {
 
   return (
     <Screen
-      title="Customers"
+      title={t('customers')}
       action={
-        <button className="icon-btn" onClick={() => setAdding(!adding)} aria-label="Add customer">
+        <button className="icon-btn" onClick={() => setAdding(!adding)} aria-label={t('addCustomer')}>
           <IconPlus />
         </button>
       }
@@ -116,10 +118,10 @@ export default function Customers() {
       {error && <div className="alert error">{error}</div>}
 
       {adding && (
-        <Sheet title="Add customer" onClose={() => setAdding(false)}>
+        <Sheet title={t('addCustomer')} onClose={() => setAdding(false)}>
           <form onSubmit={save}>
             <div className="field">
-              <label htmlFor="name">Name</label>
+              <label htmlFor="name">{t('name')}</label>
               <input
                 id="name" className="control" required value={form.name} autoFocus
                 onChange={(event) => setForm({ ...form, name: event.target.value })}
@@ -127,16 +129,18 @@ export default function Customers() {
             </div>
             <div className="field-row">
               <div className="field">
-                <label htmlFor="type">Type</label>
+                <label htmlFor="type">{t('type')}</label>
                 <select
                   id="type" className="control" value={form.type}
                   onChange={(event) => setForm({ ...form, type: event.target.value })}
                 >
-                  {types.map((type) => <option key={type} value={type}>{type}</option>)}
+                  {types.map((type) => (
+                    <option key={type} value={type}>{t(customerTypeKey(type))}</option>
+                  ))}
                 </select>
               </div>
               <div className="field">
-                <label htmlFor="zone">Zone</label>
+                <label htmlFor="zone">{t('zone')}</label>
                 <select
                   id="zone" className="control" value={form.zoneId}
                   onChange={(event) => setForm({ ...form, zoneId: event.target.value })}
@@ -147,14 +151,14 @@ export default function Customers() {
               </div>
             </div>
             <div className="field">
-              <label htmlFor="phone">Phone</label>
+              <label htmlFor="phone">{t('phone')}</label>
               <input
                 id="phone" className="control" inputMode="tel" value={form.phone}
                 onChange={(event) => setForm({ ...form, phone: event.target.value })}
               />
             </div>
             <div className="field">
-              <label htmlFor="address">Address</label>
+              <label htmlFor="address">{t('address')}</label>
               <input
                 id="address" className="control" value={form.address}
                 onChange={(event) => setForm({ ...form, address: event.target.value })}
@@ -162,21 +166,21 @@ export default function Customers() {
             </div>
 
             <div className="field">
-              <label>Location</label>
+              <label>{t('location')}</label>
               <button type="button" className="btn ghost" onClick={pinHere} disabled={locating}>
                 <IconPin size={17} />
-                {locating ? 'Getting your location…' : pinned ? 'Location pinned — tap to redo' : 'Pin at my current location'}
+                {locating ? t('gettingLocation') : pinned ? t('pinAgain') : t('pinHere')}
               </button>
               <p className="muted" style={{ fontSize: 12, margin: '6px 0 0' }}>
                 {pinned
-                  ? `Saved at ${pinned.lat.toFixed(4)}, ${pinned.lng.toFixed(4)}.`
-                  : 'Pin the shop while you are standing in it — visit check-ins are then verified against it.'}
+                  ? t('pinSavedAt', { lat: pinned.lat.toFixed(4), lng: pinned.lng.toFixed(4) })
+                  : t('pinHint')}
               </p>
             </div>
 
             <div className="sheet-actions">
-              <button className="btn ghost" type="button" onClick={() => setAdding(false)}>Cancel</button>
-              <button className="btn" disabled={saving}>{saving ? 'Saving…' : 'Save customer'}</button>
+              <button className="btn ghost" type="button" onClick={() => setAdding(false)}>{t('cancel')}</button>
+              <button className="btn" disabled={saving}>{saving ? t('saving') : t('saveCustomer')}</button>
             </div>
           </form>
         </Sheet>
@@ -184,9 +188,9 @@ export default function Customers() {
 
       {confirming && (
         <ConfirmSheet
-          title={`Remove ${confirming.name}?`}
-          message="Their past orders stay in the reports; only the customer record is removed."
-          confirmLabel="Remove"
+          title={t('removeCustomer', { name: confirming.name })}
+          message={t('removeCustomerText')}
+          confirmLabel={t('remove')}
           onConfirm={destroy}
           onCancel={() => setConfirming(null)}
           busy={saving}
@@ -196,7 +200,7 @@ export default function Customers() {
       <div className="search-wrap">
         <span className="icon"><IconSearch size={19} /></span>
         <input
-          className="control" placeholder="Search customers" value={search}
+          className="control" placeholder={t('searchCustomers')} value={search}
           onChange={(event) => setSearch(event.target.value)}
         />
       </div>
@@ -204,7 +208,7 @@ export default function Customers() {
       <div className="toggle" style={{ marginBottom: 14 }}>
         {['all', ...types].map((type) => (
           <button key={type} className={typeFilter === type ? 'on' : ''} onClick={() => setTypeFilter(type)}>
-            {type === 'all' ? 'All' : type}
+            {type === 'all' ? t('all') : t(customerTypeKey(type))}
           </button>
         ))}
       </div>
@@ -213,12 +217,8 @@ export default function Customers() {
       {customers && visible.length === 0 && (
         <Empty
           icon={<IconUsers size={26} />}
-          headline={search || typeFilter !== 'all' ? 'No matches' : 'No customers yet'}
-          text={
-            search || typeFilter !== 'all'
-              ? 'Try a different search or filter.'
-              : 'Add the pharmacies, clinics and hospitals on your route.'
-          }
+          headline={search || typeFilter !== 'all' ? t('noMatches') : t('noCustomersYet')}
+          text={search || typeFilter !== 'all' ? t('noMatchesText') : t('noCustomersYetText')}
         />
       )}
 
@@ -229,15 +229,15 @@ export default function Customers() {
             <span className="grow">
               <span className="title">{customer.name}</span>
               <span className="sub">
-                {customer.type}
-                {customer.phone ? ` · ${customer.phone}` : ''}
+                {t(customerTypeKey(customer.type))}
+                {customer.phone ? <> · <span className="ltr-text">{customer.phone}</span></> : ''}
                 {customer.address ? ` · ${customer.address}` : ''}
-                {customer.lat != null && customer.lng != null ? ' · 📍 pinned' : ''}
+                {customer.lat != null && customer.lng != null ? ` · 📍 ${t('pinnedLabel')}` : ''}
               </span>
             </span>
             <button
               className="icon-btn" style={{ color: 'var(--danger)' }}
-              onClick={() => setConfirming(customer)} aria-label={`Remove ${customer.name}`}
+              onClick={() => setConfirming(customer)} aria-label={t('removeCustomer', { name: customer.name })}
             >
               <IconTrash size={18} />
             </button>

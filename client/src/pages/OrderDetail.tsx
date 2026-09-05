@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { api, type Customer, type Order, type Product } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { money, shortDate } from '../lib/format';
+import { customerTypeKey, useT } from '../lib/i18n';
 import { Screen, Skeleton } from '../components/Layout';
 import { ConfirmSheet } from '../components/Sheet';
 import { useToast } from '../components/Toast';
@@ -11,6 +12,7 @@ import { IconPen, IconTrash } from '../components/Icons';
 export default function OrderDetail() {
   const { id } = useParams();
   const { user } = useAuth();
+  const t = useT();
   const toast = useToast();
   const navigate = useNavigate();
   const [order, setOrder] = useState<Order | null>(null);
@@ -33,21 +35,21 @@ export default function OrderDetail() {
     if (!order) return;
     try {
       await api.deleteOrder(order.id);
-      toast('Record deleted');
+      toast(t('recordDeleted'));
       navigate('/orders', { replace: true });
     } catch (err) {
       setConfirming(false);
-      toast(err instanceof Error ? err.message : 'Could not delete', 'error');
+      toast(t('couldNotDelete'), 'error');
     }
   }
 
   return (
     <Screen
-      title={order?.code || 'Record'}
+      title={order?.code || t('record')}
       back
       action={
         order && (
-          <button className="icon-btn" onClick={() => setConfirming(true)} aria-label="Delete record">
+          <button className="icon-btn" onClick={() => setConfirming(true)} aria-label={t('deleteRecord')}>
             <IconTrash />
           </button>
         )
@@ -63,27 +65,27 @@ export default function OrderDetail() {
               <div>
                 <div style={{ fontWeight: 700, fontSize: 17 }}>{customer?.name || 'Customer'}</div>
                 <div className="muted" style={{ fontSize: 13, marginTop: 3 }}>
-                  {shortDate(order.date)} · {customer?.type || '—'}
+                  {shortDate(order.date)} · {customer ? t(customerTypeKey(customer.type)) : '—'}
                 </div>
               </div>
-              <span className={`pill ${order.type === 'return' ? 'return' : ''}`}>{order.type}</span>
+              <span className={`pill ${order.type === 'return' ? 'return' : ''}`}>{t(order.type === 'return' ? 'return' : 'order')}</span>
             </div>
             {customer?.address && (
               <div className="muted" style={{ fontSize: 12.5, marginTop: 8 }}>{customer.address}</div>
             )}
           </div>
 
-          <div className="section-title">Items</div>
+          <div className="section-title">{t('products')}</div>
           <div className="card table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th>Product</th>
-                  <th className="num">Qty</th>
-                  <th className="num">Bonus</th>
-                  <th className="num">Price</th>
-                  <th className="num">Disc</th>
-                  <th className="num">Total</th>
+                  <th>{t('product')}</th>
+                  <th className="num">{t('qty')}</th>
+                  <th className="num">{t('bonusShort')}</th>
+                  <th className="num">{t('price')}</th>
+                  <th className="num">{t('discount')}</th>
+                  <th className="num">{t('total')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -108,7 +110,7 @@ export default function OrderDetail() {
 
           {order.note && (
             <>
-              <div className="section-title">Note</div>
+              <div className="section-title">{t('note')}</div>
               <div className="card">{order.note}</div>
             </>
           )}
@@ -116,26 +118,26 @@ export default function OrderDetail() {
           {order.signature && (
             <>
               <div className="section-title">
-                <span><IconPen size={13} /> Signature</span>
+                <span><IconPen size={13} /> {t('signature')}</span>
               </div>
               <div className="card">
-                <img className="sig-preview" src={order.signature} alt="Customer signature" />
+                <img className="sig-preview" src={order.signature} alt={t('customerSignature')} />
                 {order.signedBy && (
-                  <div className="muted" style={{ fontSize: 12.5, marginTop: 6 }}>Signed by {order.signedBy}</div>
+                  <div className="muted" style={{ fontSize: 12.5, marginTop: 6 }}>{t('signedByName', { name: order.signedBy })}</div>
                 )}
               </div>
             </>
           )}
 
           <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span className="muted">Total</span>
+            <span className="muted">{t('total')}</span>
             <strong style={{ fontSize: 21 }}>{money(order.total, user?.currency)}</strong>
           </div>
 
           {confirming && (
             <ConfirmSheet
-              title="Delete this record?"
-              message="It disappears from your records and from your manager's reports. This cannot be undone."
+              title={t('deleteThisRecord')}
+              message={t('deleteRecordText')}
               onConfirm={destroy}
               onCancel={() => setConfirming(false)}
             />

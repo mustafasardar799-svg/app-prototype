@@ -1,0 +1,15 @@
+/* Self-hosted so the app keeps its typography with no connection and makes no
+   third-party request.
+   Only the subsets this app actually renders are imported — pulling in the full
+   Fontsource packages would ship Cyrillic, Greek and Vietnamese faces that a
+   sales rep on a phone connection would download and never see. */
+@import '@fontsource/inter/latin-400.css';
+@import '@fontsource/inter/latin-500.css';
+@import '@fontsource/inter/latin-600.css';
+@import '@fontsource/inter/latin-700.css';
+@import '@fontsource/inter/latin-800.css';
+
+@import '@fontsource/noto-sans-arabic/arabic-400.css';
+@import '@fontsource/noto-sans-arabic/arabic-500.css';
+@import '@fontsource/noto-sans-arabic/arabic-600.css';
+@import '@fontsource/noto-sans-arabic/arabic-700.css';

@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, type TeamMember } from '../lib/api';
 import { useAuth } from '../lib/auth';
-import { daysAgo, initials, money, roleLabel, shortDate, today } from '../lib/format';
+import { daysAgo, initials, money, shortDate, today } from '../lib/format';
+import { roleKey, useT } from '../lib/i18n';
 import { Empty, Screen, Skeleton } from '../components/Layout';
 import { Meter } from '../components/Charts';
 import { Sheet } from '../components/Sheet';
@@ -12,6 +13,7 @@ import { IconTarget, IconUsers } from '../components/Icons';
 /** Manager / team-leader view: how each staff member performed in a period. */
 export default function Team() {
   const { user } = useAuth();
+  const t = useT();
   const toast = useToast();
   const navigate = useNavigate();
   const [range, setRange] = useState({ from: daysAgo(30), to: today() });
@@ -44,11 +46,11 @@ export default function Team() {
     setSavingTarget(true);
     try {
       await api.setTarget(editingTarget.id, Number(targetValue) || 0);
-      toast(`Target set for ${editingTarget.name}`);
+      toast(t('targetSetFor', { name: editingTarget.name }));
       setEditingTarget(null);
       await load();
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Could not set the target', 'error');
+      toast(t('couldNotSetTarget'), 'error');
     } finally {
       setSavingTarget(false);
     }
@@ -65,18 +67,18 @@ export default function Team() {
   );
 
   return (
-    <Screen title="Team Activity">
+    <Screen title={t('teamActivity')}>
       <div className="card">
         <div className="field-row" style={{ marginBottom: 0 }}>
           <div className="field" style={{ marginBottom: 0 }}>
-            <label htmlFor="from">From</label>
+            <label htmlFor="from">{t('from')}</label>
             <input
               id="from" type="date" className="control" value={range.from}
               onChange={(event) => setRange((prev) => ({ ...prev, from: event.target.value }))}
             />
           </div>
           <div className="field" style={{ marginBottom: 0 }}>
-            <label htmlFor="to">To</label>
+            <label htmlFor="to">{t('to')}</label>
             <input
               id="to" type="date" className="control" value={range.to}
               onChange={(event) => setRange((prev) => ({ ...prev, to: event.target.value }))}
@@ -90,32 +92,32 @@ export default function Team() {
 
       {members && (
         <>
-          <div className="section-title">Team totals</div>
+          <div className="section-title">{t('teamTotals')}</div>
           <div className="kpis">
             <div className="kpi">
-              <div className="label">Net sales</div>
+              <div className="label">{t('netSales')}</div>
               <div className="value">{money(totals.net, user?.currency)}</div>
             </div>
             <div className="kpi">
-              <div className="label">Orders</div>
+              <div className="label">{t('orders')}</div>
               <div className="value">{totals.orders}</div>
             </div>
             <div className="kpi">
-              <div className="label">Collected</div>
+              <div className="label">{t('collected')}</div>
               <div className="value">{money(totals.collected, user?.currency)}</div>
             </div>
             <div className="kpi">
-              <div className="label">Expenses</div>
+              <div className="label">{t('expenses')}</div>
               <div className="value">{money(totals.expenses, user?.currency)}</div>
             </div>
           </div>
 
-          <div className="section-title">Staff ({members.length})</div>
+          <div className="section-title">{t('staffCount', { count: members.length })}</div>
           {members.length === 0 && (
             <Empty
               icon={<IconUsers size={26} />}
-              headline="No staff yet"
-              text="Representatives assigned to you will appear here."
+              headline={t('noStaffYet')}
+              text={t('noStaffYetText')}
             />
           )}
 
@@ -131,7 +133,7 @@ export default function Team() {
                   <span className="grow">
                     <span className="title">{member.name}</span>
                     <span className="sub">
-                      {roleLabel(member.role)} · {member.zone}
+                      {t(roleKey(member.role))} · {member.zone}
                     </span>
                   </span>
                   <span style={{ textAlign: 'right' }}>
@@ -139,7 +141,7 @@ export default function Team() {
                       {money(member.netTotal, user?.currency)}
                     </span>
                     <span className="muted" style={{ fontSize: 12 }}>
-                      {member.orders} order{member.orders === 1 ? '' : 's'}
+                      {member.orders} {member.orders === 1 ? t('order') : t('orders')}
                     </span>
                   </span>
                 </button>
@@ -147,7 +149,7 @@ export default function Team() {
                 {member.target > 0 && (
                   <div style={{ padding: '0 14px 12px' }}>
                     <Meter
-                      label="Target"
+                      label={t('target')}
                       value={member.netTotal}
                       target={member.target}
                       currency={user?.currency}
@@ -161,27 +163,27 @@ export default function Team() {
                     <div className="table-wrap">
                       <table>
                         <tbody>
-                          <Detail label="Gross sales" value={money(member.salesTotal, user?.currency)} />
-                          <Detail label="Returns" value={money(member.returnsTotal, user?.currency)} />
+                          <Detail label={t('grossSales')} value={money(member.salesTotal, user?.currency)} />
+                          <Detail label={t('returns')} value={money(member.returnsTotal, user?.currency)} />
                           <Detail
-                            label="Target"
+                            label={t('target')}
                             value={member.target ? money(member.target, user?.currency) : 'Not set'}
                           />
                           <Detail
-                            label="Attainment"
+                            label={t('attainment')}
                             value={member.attainment != null ? `${member.attainment}%` : '—'}
                           />
-                          <Detail label="Collected" value={money(member.collected, user?.currency)} />
-                          <Detail label="Expenses" value={money(member.expenses, user?.currency)} />
-                          <Detail label="Visits / calls" value={`${member.visits} / ${member.calls}`} />
-                          <Detail label="Last activity" value={shortDate(member.lastActivity)} />
-                          <Detail label="Phone" value={member.phone || '—'} />
+                          <Detail label={t('collected')} value={money(member.collected, user?.currency)} />
+                          <Detail label={t('expenses')} value={money(member.expenses, user?.currency)} />
+                          <Detail label={t('visitsCalls')} value={`${member.visits} / ${member.calls}`} />
+                          <Detail label={t('lastActivity')} value={shortDate(member.lastActivity)} />
+                          <Detail label={t('phone')} value={member.phone || '—'} />
                         </tbody>
                       </table>
                     </div>
                     <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
                       <button className="btn small ghost" onClick={() => navigate(`/report?userId=${member.id}`)}>
-                        View sales report
+                        {t('viewSalesReport')}
                       </button>
                       <button
                         className="btn small ghost"
@@ -190,7 +192,7 @@ export default function Team() {
                           setTargetValue(String(member.target || ''));
                         }}
                       >
-                        <IconTarget size={16} /> Set target
+                        <IconTarget size={16} /> {t('setTarget')}
                       </button>
                     </div>
                   </div>
@@ -202,10 +204,10 @@ export default function Team() {
       )}
 
       {editingTarget && (
-        <Sheet title={`Monthly target — ${editingTarget.name}`} onClose={() => setEditingTarget(null)}>
+        <Sheet title={t('monthlyTargetFor', { name: editingTarget.name })} onClose={() => setEditingTarget(null)}>
           <form onSubmit={saveTarget}>
             <div className="field">
-              <label htmlFor="target">Target ({user?.currency || 'IQD'})</label>
+              <label htmlFor="target">{t('target')} ({user?.currency || 'IQD'})</label>
               <input
                 id="target" className="control" type="number" min={0} inputMode="decimal"
                 value={targetValue} onChange={(event) => setTargetValue(event.target.value)}
@@ -213,11 +215,11 @@ export default function Team() {
               />
             </div>
             <p className="muted" style={{ fontSize: 12.5, marginTop: 0 }}>
-              Net sales this rep is expected to reach each month. Set 0 to remove the target.
+              {t('targetHint')}
             </p>
             <div className="sheet-actions">
-              <button className="btn ghost" type="button" onClick={() => setEditingTarget(null)}>Cancel</button>
-              <button className="btn" disabled={savingTarget}>{savingTarget ? 'Saving…' : 'Save target'}</button>
+              <button className="btn ghost" type="button" onClick={() => setEditingTarget(null)}>{t('cancel')}</button>
+              <button className="btn" disabled={savingTarget}>{savingTarget ? t('saving') : t('saveTarget')}</button>
             </div>
           </form>
         </Sheet>

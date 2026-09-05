@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
-import { initials, roleLabel } from '../lib/format';
+import { initials } from '../lib/format';
+import { locales, roleKey, useI18n, useT } from '../lib/i18n';
 import { Screen } from '../components/Layout';
 import { ConfirmSheet } from '../components/Sheet';
 import { useToast } from '../components/Toast';
@@ -15,6 +16,8 @@ export default function Profile() {
   const { user, refresh, signOut } = useAuth();
   const toast = useToast();
   const { choice, setChoice } = useTheme();
+  const { locale, setLocale } = useI18n();
+  const t = useT();
   const { online, queue, sync } = useConnection();
   const [params, setParams] = useSearchParams();
   const [editing, setEditing] = useState(false);
@@ -36,9 +39,9 @@ export default function Profile() {
       await api.updateMe(form);
       await refresh();
       setEditing(false);
-      toast('Profile updated');
+      toast(t('profileUpdated'));
     } catch (err) {
-      setMessage({ kind: 'error', text: err instanceof Error ? err.message : 'Could not update' });
+      setMessage({ kind: 'error', text: t('couldNotUpdate') });
     } finally {
       setBusy(false);
     }
@@ -51,9 +54,9 @@ export default function Profile() {
     try {
       await api.changePassword(passwords);
       setPasswords({ currentPassword: '', newPassword: '' });
-      toast('Password changed');
+      toast(t('passwordChanged'));
     } catch (err) {
-      setMessage({ kind: 'error', text: err instanceof Error ? err.message : 'Could not change password' });
+      setMessage({ kind: 'error', text: t('couldNotChangePassword') });
     } finally {
       setBusy(false);
     }
@@ -65,7 +68,7 @@ export default function Profile() {
       await api.deleteMe();
       signOut();
     } catch (err) {
-      setMessage({ kind: 'error', text: err instanceof Error ? err.message : 'Could not delete the account' });
+      setMessage({ kind: 'error', text: t('couldNotDeleteAccount') });
       setBusy(false);
     }
   }
@@ -77,9 +80,9 @@ export default function Profile() {
 
   return (
     <Screen
-      title="Profile"
+      title={t('profile')}
       action={
-        <button className="icon-btn" onClick={() => setEditing(!editing)} aria-label="Edit profile">
+        <button className="icon-btn" onClick={() => setEditing(!editing)} aria-label={t('editProfile')}>
           {editing ? <IconCheck /> : <IconEdit />}
         </button>
       }
@@ -97,7 +100,7 @@ export default function Profile() {
           {initials(user?.name || '')}
         </div>
         <div style={{ marginTop: 12, fontWeight: 700, fontSize: 19 }}>{user?.name}</div>
-        <div style={{ opacity: 0.85, fontSize: 13.5 }}>{roleLabel(user?.role || '')}</div>
+        <div style={{ opacity: 0.85, fontSize: 13.5 }}>{t(roleKey(user?.role || ''))}</div>
       </div>
 
       {message && <div className={`alert ${message.kind}`}>{message.text}</div>}
@@ -105,21 +108,21 @@ export default function Profile() {
       {editing ? (
         <form className="card" onSubmit={saveProfile}>
           <div className="field">
-            <label htmlFor="name">Name</label>
+            <label htmlFor="name">{t('name')}</label>
             <input
               id="name" className="control" value={form.name}
               onChange={(event) => setForm({ ...form, name: event.target.value })} required
             />
           </div>
           <div className="field">
-            <label htmlFor="phone">Phone</label>
+            <label htmlFor="phone">{t('phone')}</label>
             <input
               id="phone" className="control" inputMode="tel" value={form.phone}
               onChange={(event) => setForm({ ...form, phone: event.target.value })}
             />
           </div>
           <div className="field">
-            <label htmlFor="currency">Currency</label>
+            <label htmlFor="currency">{t('currency')}</label>
             <select
               id="currency" className="control" value={form.currency}
               onChange={(event) => setForm({ ...form, currency: event.target.value })}
@@ -128,21 +131,21 @@ export default function Profile() {
             </select>
           </div>
           <div className="sheet-actions">
-            <button className="btn ghost" type="button" onClick={() => setEditing(false)}>Cancel</button>
-            <button className="btn" disabled={busy}>Save changes</button>
+            <button className="btn ghost" type="button" onClick={() => setEditing(false)}>{t('cancel')}</button>
+            <button className="btn" disabled={busy}>{t('saveChanges')}</button>
           </div>
         </form>
       ) : (
         <div className="list">
-          <InfoRow label="Name" value={user?.name || '—'} />
-          <InfoRow label="Role" value={roleLabel(user?.role || '')} />
-          <InfoRow label="Phone" value={user?.phone || '—'} />
-          <InfoRow label="User Name" value={user?.username || '—'} />
-          <InfoRow label="Currency" value={user?.currency || 'IQD'} />
+          <InfoRow label={t('name')} value={user?.name || '—'} />
+          <InfoRow label={t('role')} value={t(roleKey(user?.role || ''))} />
+          <InfoRow label={t('phone')} value={user?.phone || '—'} />
+          <InfoRow label={t('userName')} value={user?.username || '—'} />
+          <InfoRow label={t('currency')} value={user?.currency || 'IQD'} />
           {user?.target ? (
             <div className="row" style={{ display: 'block' }}>
               <div className="muted" style={{ fontSize: 12.5 }}>
-                <IconTarget size={13} /> Monthly target
+                <IconTarget size={13} /> {t('monthlyTarget')}
               </div>
               <div style={{ fontWeight: 600, marginTop: 2 }}>{money(user.target, user.currency)}</div>
             </div>
@@ -150,13 +153,33 @@ export default function Profile() {
         </div>
       )}
 
-      <div className="section-title">Appearance</div>
+      <div className="section-title">{t('language')}</div>
+      <div className="card">
+        <div className="toggle">
+          {locales.map((entry) => (
+            <button
+              key={entry.code}
+              type="button"
+              lang={entry.code}
+              className={locale === entry.code ? 'on' : ''}
+              onClick={() => setLocale(entry.code)}
+            >
+              {entry.label}
+            </button>
+          ))}
+        </div>
+        <p className="muted" style={{ fontSize: 12.5, margin: '10px 0 0' }}>
+          {locales.find((entry) => entry.code === locale)?.english}
+        </p>
+      </div>
+
+      <div className="section-title">{t('appearance')}</div>
       <div className="card">
         <div className="toggle">
           {([
-            { key: 'system', label: 'System' },
-            { key: 'light', label: 'Light' },
-            { key: 'dark', label: 'Dark' },
+            { key: 'system', label: t('appearanceSystem') },
+            { key: 'light', label: t('appearanceLight') },
+            { key: 'dark', label: t('appearanceDark') },
           ] as { key: ThemeChoice; label: string }[]).map((option) => (
             <button
               key={option.key}
@@ -170,41 +193,43 @@ export default function Profile() {
           ))}
         </div>
         <p className="muted" style={{ fontSize: 12.5, margin: '10px 0 0' }}>
-          System follows your iPhone's Display setting.
+          {t('systemFollowsPhone')}
         </p>
       </div>
 
-      <div className="section-title">Sync</div>
+      <div className="section-title">{t('sync')}</div>
       <div className="card">
         <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
           <IconInbox size={19} />
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 600 }}>
               {queue.length === 0
-                ? 'Everything is synced'
-                : `${queue.length} record${queue.length === 1 ? '' : 's'} waiting`}
+                ? t('everythingSynced')
+                : queue.length === 1
+                  ? t('recordsWaiting', { count: queue.length })
+                  : t('recordsWaitingPlural', { count: queue.length })}
             </div>
             <div className="muted" style={{ fontSize: 12.5 }}>
-              {online ? 'Connected' : 'No connection — work is saved on this phone'}
+              {online ? t('connected') : t('noConnectionSaved')}
             </div>
           </div>
           {queue.length > 0 && online && (
-            <button className="btn small ghost" onClick={() => void sync()}>Sync now</button>
+            <button className="btn small ghost" onClick={() => void sync()}>{t('syncNow')}</button>
           )}
         </div>
         {queue.length > 0 && (
           <ul className="muted" style={{ fontSize: 12.5, margin: '10px 0 0', paddingLeft: 18 }}>
             {queue.slice(0, 5).map((entry) => (
-              <li key={entry.id}>{entry.label}</li>
+              <li key={entry.id}>{t(entry.label as Parameters<typeof t>[0])}</li>
             ))}
           </ul>
         )}
       </div>
 
-      <div className="section-title">Change password</div>
+      <div className="section-title">{t('changePassword')}</div>
       <form className="card" onSubmit={changePassword}>
         <div className="field">
-          <label htmlFor="current">Current password</label>
+          <label htmlFor="current">{t('currentPassword')}</label>
           <input
             id="current" type="password" className="control" autoComplete="current-password"
             value={passwords.currentPassword}
@@ -213,7 +238,7 @@ export default function Profile() {
           />
         </div>
         <div className="field">
-          <label htmlFor="next">New password</label>
+          <label htmlFor="next">{t('newPassword')}</label>
           <input
             id="next" type="password" className="control" autoComplete="new-password" minLength={6}
             value={passwords.newPassword}
@@ -221,19 +246,19 @@ export default function Profile() {
             required
           />
         </div>
-        <button className="btn ghost" disabled={busy}>Update password</button>
+        <button className="btn ghost" disabled={busy}>{t('updatePassword')}</button>
       </form>
 
-      <div className="section-title">Account</div>
+      <div className="section-title">{t('account')}</div>
       <button className="btn danger" onClick={() => setConfirmingDelete(true)}>
-        <IconTrash size={18} /> Delete Account
+        <IconTrash size={18} /> {t('deleteAccount')}
       </button>
 
       {confirmingDelete && (
         <ConfirmSheet
-          title="Delete your account?"
-          message="You will be signed out and your account hidden from the app. The sales you recorded stay in the company reports."
-          confirmLabel="Delete account"
+          title={t('deleteYourAccount')}
+          message={t('deleteAccountText')}
+          confirmLabel={t('deleteAccount')}
           onConfirm={deleteAccount}
           onCancel={dismissDelete}
           busy={busy}
@@ -241,7 +266,7 @@ export default function Profile() {
       )}
 
       <button className="btn ghost" style={{ marginTop: 10 }} onClick={signOut}>
-        <IconLogout size={18} /> Logout
+        <IconLogout size={18} /> {t('logout')}
       </button>
     </Screen>
   );

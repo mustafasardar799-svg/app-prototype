@@ -3,7 +3,7 @@
    basement pharmacy still sees their queued work. API traffic is never
    cached: stale sales figures would be worse than none. */
 
-const SHELL_CACHE = 'eliavit-shell-v2';
+const SHELL_CACHE = 'eliavit-shell-v3';
 const SHELL_ASSETS = ['/', '/index.html', '/manifest.webmanifest', '/apple-touch-icon.png'];
 
 /**
@@ -19,11 +19,27 @@ async function precacheShell() {
 
   try {
     const html = await (await fetch('/index.html', { cache: 'reload' })).text();
-    const assets = [...html.matchAll(/(?:src|href)="(\/[^"]+\.(?:js|css|png|webmanifest))"/g)].map(
-      (match) => match[1],
-    );
+    const assets = [
+      ...html.matchAll(/(?:src|href)="(\/[^"]+\.(?:js|css|png|webmanifest))"/g),
+    ].map((match) => match[1]);
+
+    // Stylesheets pull in the self-hosted fonts. Without them a phone that goes
+    // offline before they are first needed loses Inter and the Arabic face, and
+    // the app falls back to whatever the system provides.
+    const fonts = [];
+    for (const asset of assets.filter((url) => url.endsWith('.css'))) {
+      try {
+        const css = await (await fetch(asset)).text();
+        for (const match of css.matchAll(/url\(([^)]+\.woff2?)\)/g)) {
+          fonts.push(new URL(match[1].replace(/["']/g, ''), new URL(asset, self.location)).pathname);
+        }
+      } catch {
+        // One unreadable stylesheet should not fail the whole install.
+      }
+    }
+
     await Promise.all(
-      [...new Set(assets)].map((url) => cache.add(url).catch(() => undefined)),
+      [...new Set([...assets, ...fonts])].map((url) => cache.add(url).catch(() => undefined)),
     );
   } catch {
     // Offline at install time: the fetch handler will fill the cache later.

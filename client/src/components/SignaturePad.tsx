@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useT } from '../lib/i18n';
 
 /**
  * Captures the customer's signature on the phone when an order is taken —
@@ -6,6 +7,7 @@ import { useEffect, useRef, useState } from 'react';
  * Exports a small monochrome PNG so the stored record stays light.
  */
 export function SignaturePad({ onChange }: { onChange: (dataUrl: string) => void }) {
+  const t = useT();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
   const [hasInk, setHasInk] = useState(false);
@@ -79,14 +81,14 @@ export function SignaturePad({ onChange }: { onChange: (dataUrl: string) => void
         onPointerUp={end}
         onPointerLeave={end}
         onPointerCancel={end}
-        aria-label="Signature area — sign with your finger"
+        aria-label={t('signatureArea')}
       />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
         <span className="muted" style={{ fontSize: 12 }}>
-          {hasInk ? 'Signed' : 'Ask the customer to sign above'}
+          {hasInk ? t('signed') : t('signatureAsk')}
         </span>
         <button type="button" className="btn small ghost" onClick={clear} disabled={!hasInk}>
-          Clear
+          {t('clear')}
         </button>
       </div>
     </div>

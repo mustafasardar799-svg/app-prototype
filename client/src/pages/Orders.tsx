@@ -3,11 +3,13 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api, type Customer, type Order, type User } from '../lib/api';
 import { useAuth, isManagerial } from '../lib/auth';
 import { money, shortDate } from '../lib/format';
+import { useT } from '../lib/i18n';
 import { Empty, Screen, Skeleton } from '../components/Layout';
 import { IconOrder, IconPlus, IconReturn } from '../components/Icons';
 
 export default function Orders() {
   const { user } = useAuth();
+  const t = useT();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const type = params.get('type') || 'both';
@@ -46,18 +48,18 @@ export default function Orders() {
 
   return (
     <Screen
-      title="Orders & Returns"
+      title={t('ordersAndReturns')}
       action={
-        <button className="icon-btn" onClick={() => navigate('/orders/new?type=order')} aria-label="New order">
+        <button className="icon-btn" onClick={() => navigate('/orders/new?type=order')} aria-label={t('newOrder')}>
           <IconPlus />
         </button>
       }
     >
       <div className="toggle" style={{ marginBottom: 14 }}>
         {[
-          { key: 'both', label: 'All' },
-          { key: 'order', label: 'Orders' },
-          { key: 'return', label: 'Returns' },
+          { key: 'both', label: t('all') },
+          { key: 'order', label: t('orders') },
+          { key: 'return', label: t('returns') },
         ].map((option) => (
           <button
             key={option.key}
@@ -71,7 +73,7 @@ export default function Orders() {
 
       {error && <div className="alert error">{error}</div>}
       {!orders && !error && <Skeleton height={72} count={5} />}
-      {orders && orders.length === 0 && <Empty text="No records for this filter yet." />}
+      {orders && orders.length === 0 && <Empty text={t('noRecordsForFilter')} />}
 
       <div className="list">
         {orders?.map((order) => (
@@ -82,8 +84,8 @@ export default function Orders() {
             <span className="grow">
               <span className="title">{customerName(order.customerId)}</span>
               <span className="sub">
-                {order.code} · {shortDate(order.date)} · {order.lines.length} item
-                {order.lines.length === 1 ? '' : 's'}
+                <span className="ltr-text">{order.code}</span> · {shortDate(order.date)} ·{' '}
+                {order.lines.length} {order.lines.length === 1 ? t('item') : t('items')}
                 {isManagerial(user) && staffName(order.userId) ? ` · ${staffName(order.userId)}` : ''}
               </span>
             </span>
@@ -95,17 +97,17 @@ export default function Orders() {
                 {order.type === 'return' ? '-' : ''}
                 {money(order.total, user?.currency)}
               </span>
-              {order.status === 'pending' && <span className="pill pending">pending</span>}
+              {order.status === 'pending' && <span className="pill warn">{t('pending')}</span>}
             </span>
           </button>
         ))}
       </div>
 
       <button className="btn" style={{ marginTop: 16 }} onClick={() => navigate('/orders/new?type=order')}>
-        <IconPlus size={18} /> New order
+        <IconPlus size={18} /> {t('newOrder')}
       </button>
       <button className="btn ghost" style={{ marginTop: 10 }} onClick={() => navigate('/orders/new?type=return')}>
-        <IconReturn size={18} /> New return
+        <IconReturn size={18} /> {t('newReturn')}
       </button>
     </Screen>
   );

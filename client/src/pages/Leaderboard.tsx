@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { api, type LeaderboardRow } from '../lib/api';
 import { useAuth } from '../lib/auth';
-import { initials, money, roleLabel } from '../lib/format';
+import { initials, money } from '../lib/format';
+import { roleKey, useT } from '../lib/i18n';
 import { Empty, Screen, Skeleton } from '../components/Layout';
 import { IconTrophy } from '../components/Icons';
 
@@ -11,6 +12,7 @@ import { IconTrophy } from '../components/Icons';
  */
 export default function Leaderboard() {
   const { user } = useAuth();
+  const t = useT();
   const [rows, setRows] = useState<LeaderboardRow[] | null>(null);
   const [error, setError] = useState('');
 
@@ -21,7 +23,7 @@ export default function Leaderboard() {
   const me = rows?.find((row) => row.isMe);
 
   return (
-    <Screen title="Ranking">
+    <Screen title={t('ranking')}>
       {error && <div className="alert error">{error}</div>}
       {!rows && !error && <Skeleton height={70} count={4} />}
 
@@ -30,8 +32,8 @@ export default function Leaderboard() {
           {me && (
             <div className="hero" style={{ marginBottom: 4 }}>
               <div className="hero-head">
-                <span className="label">Your position this month</span>
-                <strong>#{me.rank} of {rows.length}</strong>
+                <span className="label">{t('yourPosition')}</span>
+                <strong>{t('positionOf', { rank: me.rank, total: rows.length })}</strong>
               </div>
               <div className="hero-figure">
                 {new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(me.net)}
@@ -39,15 +41,18 @@ export default function Leaderboard() {
               </div>
               {me.attainment != null && (
                 <div style={{ marginTop: 8, fontSize: 13, opacity: 0.9 }}>
-                  {me.attainment}% of your {money(me.target, user?.currency)} target
+                  {t('attainmentOfTarget', {
+                    percent: me.attainment,
+                    target: money(me.target, user?.currency),
+                  })}
                 </div>
               )}
             </div>
           )}
 
-          <div className="section-title">This month, by net sales</div>
+          <div className="section-title">{t('byNetSalesThisMonth')}</div>
           {rows.length === 0 && (
-            <Empty icon={<IconTrophy size={26} />} headline="Nobody ranked yet" text="Records will appear as the team sells." />
+            <Empty icon={<IconTrophy size={26} />} headline={t('nobodyRankedYet')} text={t('nobodyRankedYetText')} />
           )}
 
           <div className="list">
@@ -62,10 +67,10 @@ export default function Leaderboard() {
                 <span className="grow">
                   <span className="title">
                     {row.name}
-                    {row.isMe ? ' · you' : ''}
+                    {row.isMe ? ` · ${t('you')}` : ''}
                   </span>
                   <span className="sub">
-                    {roleLabel(row.role)} · {row.orders} order{row.orders === 1 ? '' : 's'}
+                    {t(roleKey(row.role))} · {row.orders} {row.orders === 1 ? t('order') : t('orders')}
                   </span>
                 </span>
                 <span style={{ textAlign: 'right' }}>
@@ -77,7 +82,7 @@ export default function Leaderboard() {
                       className={`pill ${row.attainment >= 100 ? 'good' : row.attainment >= 60 ? '' : 'warn'}`}
                       style={{ marginTop: 3 }}
                     >
-                      {row.attainment}% of target
+                      {t('percentOfTargetShort', { percent: row.attainment })}
                     </span>
                   )}
                 </span>

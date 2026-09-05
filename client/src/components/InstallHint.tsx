@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useT } from '../lib/i18n';
 import { IconClose, IconShare } from './Icons';
 
 const DISMISS_KEY = 'eliavit.installHintDismissed';
@@ -18,6 +19,7 @@ const isStandalone = () =>
  * Share → Add to Home Screen route. Shown once, and never in the installed app.
  */
 export function InstallHint() {
+  const t = useT();
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -44,11 +46,10 @@ export function InstallHint() {
     <div className="install-hint">
       <IconShare size={20} />
       <div className="body">
-        <strong>Install EliaVit on your iPhone</strong>
-        Tap <IconShare size={13} /> Share in Safari, then <b>Add to Home Screen</b>. It opens full
-        screen and keeps working without signal.
+        <strong>{t('installTitle')}</strong>
+        {t('installBody')}
       </div>
-      <button className="close" onClick={dismiss} aria-label="Dismiss">
+      <button className="close" onClick={dismiss} aria-label={t('dismiss')}>
         <IconClose size={16} />
       </button>
     </div>

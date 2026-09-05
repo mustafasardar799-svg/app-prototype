@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { api, OfflineQueuedError, type Customer, type Visit } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { money, shortDate, today } from '../lib/format';
+import { callPurposeKey, expenseCategoryKey, useT, type TranslateKey } from '../lib/i18n';
 import { Empty, Screen, Skeleton } from '../components/Layout';
 import { ConfirmSheet, Sheet } from '../components/Sheet';
 import { useToast } from '../components/Toast';
@@ -14,7 +15,7 @@ interface FieldSpec {
   key: string;
   label: string;
   type: 'text' | 'number' | 'date' | 'select' | 'customer' | 'textarea';
-  options?: string[];
+  options?: { value: string; label: string }[];
   required?: boolean;
   placeholder?: string;
 }
@@ -50,6 +51,7 @@ interface RecordConfig {
  */
 function RecordScreen({ config }: { config: RecordConfig }) {
   const { user } = useAuth();
+  const t = useT();
   const toast = useToast();
   const [rows, setRows] = useState<Row[] | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -63,7 +65,7 @@ function RecordScreen({ config }: { config: RecordConfig }) {
     try {
       setRows((await config.list()) as Row[]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not load');
+      setError(t('couldNotLoad'));
     }
   };
 
@@ -88,16 +90,16 @@ function RecordScreen({ config }: { config: RecordConfig }) {
       await config.create(form);
       setForm(config.initial);
       setAdding(false);
-      toast('Saved');
+      toast(t('saved'));
       await reload();
     } catch (err) {
       if (err instanceof OfflineQueuedError) {
         // The write is parked on the phone; treat it as a success for the user.
         setForm(config.initial);
         setAdding(false);
-        toast(err.message, 'info');
+        toast(t('savedOnPhone', { label: t(err.labelKey as TranslateKey) }), 'info');
       } else {
-        toast(err instanceof Error ? err.message : 'Could not save', 'error');
+        toast(err instanceof Error ? err.message : t('couldNotSave'), 'error');
       }
     } finally {
       setSaving(false);
@@ -110,10 +112,10 @@ function RecordScreen({ config }: { config: RecordConfig }) {
     try {
       await config.remove(confirming.id);
       setConfirming(null);
-      toast('Deleted');
+      toast(t('deleted'));
       await reload();
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Could not delete', 'error');
+      toast(t('couldNotDelete'), 'error');
     } finally {
       setSaving(false);
     }
@@ -155,7 +157,7 @@ function RecordScreen({ config }: { config: RecordConfig }) {
                 className="icon-btn"
                 style={{ color: 'var(--danger)' }}
                 onClick={() => setConfirming(row)}
-                aria-label="Delete record"
+                aria-label={t('deleteRecord')}
               >
                 <IconTrash size={18} />
               </button>
@@ -183,7 +185,7 @@ function RecordScreen({ config }: { config: RecordConfig }) {
                     value={form[field.key] || ''}
                     onChange={(event) => setForm({ ...form, [field.key]: event.target.value })}
                   >
-                    <option value="">Select customer…</option>
+                    <option value="">{t('selectCustomer')}</option>
                     {customers.map((customer) => (
                       <option key={customer.id} value={customer.id}>{customer.name}</option>
                     ))}
@@ -194,7 +196,7 @@ function RecordScreen({ config }: { config: RecordConfig }) {
                     onChange={(event) => setForm({ ...form, [field.key]: event.target.value })}
                   >
                     {(field.options || []).map((option) => (
-                      <option key={option} value={option}>{option}</option>
+                      <option key={option.value} value={option.value}>{option.label}</option>
                     ))}
                   </select>
                 ) : field.type === 'textarea' ? (
@@ -215,8 +217,8 @@ function RecordScreen({ config }: { config: RecordConfig }) {
               </div>
             ))}
             <div className="sheet-actions">
-              <button className="btn ghost" type="button" onClick={() => setAdding(false)}>Cancel</button>
-              <button className="btn" disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
+              <button className="btn ghost" type="button" onClick={() => setAdding(false)}>{t('cancel')}</button>
+              <button className="btn" disabled={saving}>{saving ? t('saving') : t('save')}</button>
             </div>
           </form>
         </Sheet>
@@ -224,8 +226,8 @@ function RecordScreen({ config }: { config: RecordConfig }) {
 
       {confirming && (
         <ConfirmSheet
-          title="Delete record?"
-          message="This removes it from your records and from your manager's reports."
+          title={t('deleteRecordQuestion')}
+          message={t('deleteRecordQuestionText')}
           onConfirm={destroy}
           onCancel={() => setConfirming(null)}
           busy={saving}
@@ -235,29 +237,35 @@ function RecordScreen({ config }: { config: RecordConfig }) {
   );
 }
 
+// Stored in English on the server; translated only for display.
 const expenseCategories = ['Fuel', 'Meal', 'Hotel', 'Transport', 'Gift', 'Other'];
+const callPurposes = ['follow-up', 'order', 'complaint', 'introduction'];
 
 export function Expenses() {
+  const t = useT();
   return (
     <RecordScreen
       config={{
-        title: 'Expenses',
-        addTitle: 'Add expense',
+        title: t('expenses'),
+        addTitle: t('addExpense'),
         icon: <IconExpense size={26} />,
-        emptyHeadline: 'No expenses yet',
-        emptyText: 'Log fuel, meals and travel as you spend, so month-end needs no receipts hunt.',
+        emptyHeadline: t('noExpensesYet'),
+        emptyText: t('noExpensesYetText'),
         initial: { date: today(), category: 'Fuel', amount: '', note: '' },
         fields: [
-          { key: 'date', label: 'Date', type: 'date' },
-          { key: 'category', label: 'Category', type: 'select', options: expenseCategories },
-          { key: 'amount', label: 'Amount', type: 'number', required: true },
-          { key: 'note', label: 'Note', type: 'textarea', placeholder: 'Optional' },
+          { key: 'date', label: t('date'), type: 'date' },
+          {
+            key: 'category', label: t('category'), type: 'select',
+            options: expenseCategories.map((value) => ({ value, label: t(expenseCategoryKey(value)) })),
+          },
+          { key: 'amount', label: t('amount'), type: 'number', required: true },
+          { key: 'note', label: t('note'), type: 'textarea', placeholder: t('optional') },
         ],
         list: () => api.expenses(),
         create: (body) => api.createExpense(body),
         remove: (id) => api.deleteExpense(id),
-        primary: (row) => String(row.category),
-        secondary: (row) => String(row.note || 'No note'),
+        primary: (row) => t(expenseCategoryKey(String(row.category))),
+        secondary: (row) => String(row.note || t('noNote')),
         trailing: (row, currency) => <span className="amount">{money(Number(row.amount), currency)}</span>,
       }}
     />
@@ -265,27 +273,28 @@ export function Expenses() {
 }
 
 export function Collections() {
+  const t = useT();
   return (
     <RecordScreen
       config={{
-        title: 'Money Collector',
-        addTitle: 'Record collection',
+        title: t('moneyCollector'),
+        addTitle: t('recordCollection'),
         icon: <IconMoney size={26} />,
-        emptyHeadline: 'Nothing collected yet',
-        emptyText: 'Record cash and transfers as customers settle their invoices.',
+        emptyHeadline: t('nothingCollectedYet'),
+        emptyText: t('nothingCollectedYetText'),
         initial: { date: today(), customerId: '', amount: '', invoiceNo: '', note: '' },
         fields: [
-          { key: 'date', label: 'Date', type: 'date' },
-          { key: 'customerId', label: 'Customer', type: 'customer', required: true },
-          { key: 'amount', label: 'Amount collected', type: 'number', required: true },
-          { key: 'invoiceNo', label: 'Invoice no.', type: 'text', placeholder: 'INV-0000' },
-          { key: 'note', label: 'Note', type: 'textarea', placeholder: 'Optional' },
+          { key: 'date', label: t('date'), type: 'date' },
+          { key: 'customerId', label: t('customer'), type: 'customer', required: true },
+          { key: 'amount', label: t('amountCollected'), type: 'number', required: true },
+          { key: 'invoiceNo', label: t('invoiceNo'), type: 'text', placeholder: 'INV-0000' },
+          { key: 'note', label: t('note'), type: 'textarea', placeholder: t('optional') },
         ],
         list: () => api.collections(),
         create: (body) => api.createCollection(body),
         remove: (id) => api.deleteCollection(id),
         primary: (row, customerName) => customerName(row.customerId),
-        secondary: (row) => String(row.invoiceNo || row.note || 'No invoice'),
+        secondary: (row) => String(row.invoiceNo || row.note || t('noInvoice')),
         trailing: (row, currency) => (
           <span className="amount" style={{ color: 'var(--good)' }}>
             {money(Number(row.amount), currency)}
@@ -297,25 +306,26 @@ export function Collections() {
 }
 
 export function Visits() {
+  const t = useT();
   return (
     <RecordScreen
       config={{
-        title: 'Visit Plan',
-        addTitle: 'Plan a visit',
+        title: t('visitPlan'),
+        addTitle: t('planAVisit'),
         icon: <IconCalendar size={26} />,
-        emptyHeadline: 'No visits planned',
-        emptyText: 'Plan your route, then check in at each customer as you arrive.',
+        emptyHeadline: t('noVisitsPlanned'),
+        emptyText: t('noVisitsPlannedText'),
         initial: { date: today(), customerId: '', status: 'planned', note: '' },
         fields: [
-          { key: 'date', label: 'Date', type: 'date' },
-          { key: 'customerId', label: 'Customer', type: 'customer', required: true },
-          { key: 'note', label: 'Objective', type: 'textarea', placeholder: 'What is this visit for?' },
+          { key: 'date', label: t('date'), type: 'date' },
+          { key: 'customerId', label: t('customer'), type: 'customer', required: true },
+          { key: 'note', label: t('objective'), type: 'textarea', placeholder: t('objectivePlaceholder') },
         ],
         list: () => api.visits(),
         create: (body) => api.createVisit({ ...body, status: 'planned' }),
         remove: (id) => api.deleteVisit(id),
         primary: (row, customerName) => customerName(row.customerId),
-        secondary: (row) => String(row.note || 'No objective'),
+        secondary: (row) => String(row.note || t('noObjective')),
         trailing: (row) => <VisitBadge visit={row as unknown as Visit} />,
         extra: (row, reload) => <CheckInBar visit={row as unknown as Visit} onDone={reload} />,
       }}
@@ -324,10 +334,11 @@ export function Visits() {
 }
 
 function VisitBadge({ visit }: { visit: Visit }) {
-  if (visit.status !== 'done') return <span className="pill">planned</span>;
-  if (visit.verified) return <span className="pill good">on site</span>;
-  if (visit.distanceM != null) return <span className="pill warn">off site</span>;
-  return <span className="pill">checked in</span>;
+  const t = useT();
+  if (visit.status !== 'done') return <span className="pill">{t('planned')}</span>;
+  if (visit.verified) return <span className="pill good">{t('onSite')}</span>;
+  if (visit.distanceM != null) return <span className="pill warn">{t('offSite')}</span>;
+  return <span className="pill">{t('checkedIn')}</span>;
 }
 
 /**
@@ -335,6 +346,7 @@ function VisitBadge({ visit }: { visit: Visit }) {
  * see the rep was actually at the pharmacy, not marking visits from home.
  */
 function CheckInBar({ visit, onDone }: { visit: Visit; onDone: () => Promise<void> }) {
+  const t = useT();
   const toast = useToast();
   const [busy, setBusy] = useState(false);
 
@@ -342,7 +354,7 @@ function CheckInBar({ visit, onDone }: { visit: Visit; onDone: () => Promise<voi
     if (visit.distanceM == null) {
       return (
         <div style={{ padding: '0 13px 12px', fontSize: 12.5, color: 'var(--ink-soft)' }}>
-          Checked in without location.
+          {t('checkedInNoLocation')}
         </div>
       );
     }
@@ -353,8 +365,8 @@ function CheckInBar({ visit, onDone }: { visit: Visit; onDone: () => Promise<voi
       >
         <IconPin size={14} />
         {visit.verified
-          ? `Confirmed on site — ${visit.distanceM} m from the customer`
-          : `Checked in ${(visit.distanceM / 1000).toFixed(1)} km from the customer's address`}
+          ? t('confirmedOnSite', { metres: visit.distanceM })
+          : t('checkedInFarAway', { km: (visit.distanceM / 1000).toFixed(1) })}
       </div>
     );
   }
@@ -371,16 +383,16 @@ function CheckInBar({ visit, onDone }: { visit: Visit; onDone: () => Promise<voi
         .then(async (saved) => {
           toast(
             saved.verified
-              ? `Checked in — ${saved.distanceM} m from the customer`
+              ? t('checkedInMetres', { metres: saved.distanceM ?? 0 })
               : saved.distanceM != null
-                ? `Checked in, but ${(saved.distanceM / 1000).toFixed(1)} km away`
-                : 'Checked in without location',
+                ? t('checkedInButFar', { km: (saved.distanceM / 1000).toFixed(1) })
+                : t('checkedInNoLocation'),
             saved.verified ? 'ok' : 'info',
           );
           await onDone();
         })
-        .catch((err) => {
-          toast(err instanceof Error ? err.message : 'Could not check in', 'error');
+        .catch(() => {
+          toast(t('couldNotCheckIn'), 'error');
         })
         .finally(() => setBusy(false));
 
@@ -399,35 +411,42 @@ function CheckInBar({ visit, onDone }: { visit: Visit; onDone: () => Promise<voi
   return (
     <div style={{ padding: '0 13px 12px' }}>
       <button className="btn small ghost" onClick={checkIn} disabled={busy}>
-        {busy ? <>Locating…</> : <><IconCheck size={16} /> Check in here</>}
+        {busy ? <>{t('locating')}</> : <><IconCheck size={16} /> {t('checkInHere')}</>}
       </button>
     </div>
   );
 }
 
 export function Calls() {
+  const t = useT();
   return (
     <RecordScreen
       config={{
-        title: 'Calls',
-        addTitle: 'Log a call',
+        title: t('calls'),
+        addTitle: t('logACall'),
         icon: <IconPhone size={26} />,
-        emptyHeadline: 'No calls logged',
-        emptyText: 'Record follow-up calls so nothing slips between visits.',
+        emptyHeadline: t('noCallsLogged'),
+        emptyText: t('noCallsLoggedText'),
         initial: { date: today(), customerId: '', type: 'follow-up', minutes: '', note: '' },
         fields: [
-          { key: 'date', label: 'Date', type: 'date' },
-          { key: 'customerId', label: 'Customer', type: 'customer', required: true },
-          { key: 'type', label: 'Purpose', type: 'select', options: ['follow-up', 'order', 'complaint', 'introduction'] },
-          { key: 'minutes', label: 'Minutes', type: 'number' },
-          { key: 'note', label: 'Note', type: 'textarea', placeholder: 'Optional' },
+          { key: 'date', label: t('date'), type: 'date' },
+          { key: 'customerId', label: t('customer'), type: 'customer', required: true },
+          {
+            key: 'type', label: t('purpose'), type: 'select',
+            options: callPurposes.map((value) => ({ value, label: t(callPurposeKey(value)) })),
+          },
+          { key: 'minutes', label: t('minutes'), type: 'number' },
+          { key: 'note', label: t('note'), type: 'textarea', placeholder: t('optional') },
         ],
         list: () => api.calls(),
         create: (body) => api.createCall(body),
         remove: (id) => api.deleteCall(id),
         primary: (row, customerName) => customerName(row.customerId),
-        secondary: (row) => `${row.type}${row.note ? ` · ${row.note}` : ''}`,
-        trailing: (row) => <span className="pill">{Number(row.minutes) || 0} min</span>,
+        secondary: (row) =>
+          `${t(callPurposeKey(String(row.type)))}${row.note ? ` · ${row.note}` : ''}`,
+        trailing: (row) => (
+          <span className="pill">{t('minutesShort', { count: Number(row.minutes) || 0 })}</span>
+        ),
       }}
     />
   );

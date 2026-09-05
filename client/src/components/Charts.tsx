@@ -1,6 +1,7 @@
 import { useId, useState } from 'react';
 import type { TrendPoint } from '../lib/api';
-import { money, monthLabel } from '../lib/format';
+import { money, monthLabel, monthShort, number } from '../lib/format';
+import { useT } from '../lib/i18n';
 
 /**
  * Net sales per month — one series, so no legend: the caption names it.
@@ -41,6 +42,7 @@ export function TrendChart({
       </div>
       <svg
         className="chart"
+        {...{ dir: 'ltr' }}
         viewBox={`0 0 ${width} ${height}`}
         role="img"
         aria-label={`Net sales by month. ${data
@@ -102,10 +104,92 @@ export function TrendChart({
             textAnchor="middle"
             style={{ fontWeight: index === shown ? 700 : 400 }}
           >
-            {monthLabel(entry.month).slice(0, 3)}
+            {monthShort(entry.month)}
           </text>
         ))}
       </svg>
+    </div>
+  );
+}
+
+/**
+ * Ranked categories — products, zones, customer types. Horizontal, because the
+ * labels are long and a phone is narrow; one hue with the leader emphasised,
+ * so the eye lands on the top row rather than decoding a colour key.
+ */
+export function RankedBars({
+  data, currency, max = 6,
+}: {
+  data: { label: string; value: number; sub?: string }[];
+  currency?: string;
+  max?: number;
+}) {
+  const t = useT();
+  const rows = [...data].sort((a, b) => b.value - a.value).slice(0, max);
+  if (rows.length === 0) return <p className="muted" style={{ fontSize: 13 }}>{t('nothingMatches')}</p>;
+
+  const peak = Math.max(...rows.map((row) => Math.abs(row.value)), 1);
+
+  return (
+    <div className="bars">
+      {rows.map((row, index) => (
+        <div className="bar-row" key={row.label}>
+          <div className="bar-head">
+            <span className="bar-label" title={row.label}>
+              {row.label}
+              {row.sub && <span className="muted"> · {row.sub}</span>}
+            </span>
+            <span className="bar-value">{money(row.value, currency)}</span>
+          </div>
+          <div className="bar-track">
+            <div
+              className={`bar-fill${index === 0 ? ' lead' : ''}${row.value < 0 ? ' negative' : ''}`}
+              style={{ width: `${Math.max(2, (Math.abs(row.value) / peak) * 100)}%` }}
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Orders against returns for the same period. Two marks that mean opposite
+ * things, so this is the one place a second colour is doing real work — and
+ * each still carries its own written label.
+ */
+export function ComparisonBars({
+  sales, returns, currency,
+}: { sales: number; returns: number; currency?: string }) {
+  const t = useT();
+  const peak = Math.max(sales, returns, 1);
+  const share = sales > 0 ? (returns / sales) * 100 : 0;
+
+  return (
+    <div className="bars">
+      <div className="bar-row">
+        <div className="bar-head">
+          <span className="bar-label">{t('orders')}</span>
+          <span className="bar-value">{money(sales, currency)}</span>
+        </div>
+        <div className="bar-track">
+          <div className="bar-fill lead" style={{ width: `${(sales / peak) * 100}%` }} />
+        </div>
+      </div>
+      <div className="bar-row">
+        <div className="bar-head">
+          <span className="bar-label">{t('returns')}</span>
+          <span className="bar-value">{money(returns, currency)}</span>
+        </div>
+        <div className="bar-track">
+          <div className="bar-fill negative" style={{ width: `${(returns / peak) * 100}%` }} />
+        </div>
+      </div>
+      {sales > 0 && (
+        <p className="muted" style={{ fontSize: 12, margin: '2px 0 0' }}>
+          {t('returns')}: {number(share, 1)}%
+        </p>
+      )}
     </div>
   );
 }
@@ -121,6 +205,7 @@ export function Meter({
   label: string; value: number; target: number;
   currency?: string; pace?: number; onHero?: boolean;
 }) {
+  const t = useT();
   if (!target) {
     return (
       <div className="meter">
@@ -128,7 +213,7 @@ export function Meter({
           <span className="muted">{label}</span>
           <span className="value">{money(value, currency)}</span>
         </div>
-        <div className="meter-note">No target set for this month.</div>
+        <div className="meter-note">{t('noTargetSet')}</div>
       </div>
     );
   }
@@ -144,21 +229,22 @@ export function Meter({
           ? 'behind'
           : 'at-risk';
 
+  const remaining = money(target - value, currency);
   const note =
     percent >= 100
-      ? 'Target reached'
+      ? t('targetReached')
       : behindBy == null
-        ? `${money(target - value, currency)} to go`
+        ? t('toGo', { amount: remaining })
         : behindBy >= 0
-          ? `Ahead of pace · ${money(target - value, currency)} to go`
-          : `${Math.abs(Math.round(behindBy))}% behind pace · ${money(target - value, currency)} to go`;
+          ? t('aheadOfPace', { amount: remaining })
+          : t('behindPace', { percent: Math.abs(Math.round(behindBy)), amount: remaining });
 
   return (
     <div className="meter">
       <div className="meter-head">
         <span className={onHero ? '' : 'muted'}>{label}</span>
         <span className="value">
-          {Math.round(percent)}% of {money(target, currency)}
+          {t('percentOfTarget', { percent: Math.round(percent), target: money(target, currency) })}
         </span>
       </div>
       <div
@@ -170,7 +256,9 @@ export function Meter({
         aria-label={`${label}: ${Math.round(percent)} percent of target`}
       >
         <div className={`meter-fill ${state}`} style={{ width: `${Math.min(100, Math.max(0, percent))}%` }} />
-        {pace != null && pace < 100 && <div className="meter-pace" style={{ left: `${pace}%` }} />}
+        {pace != null && pace < 100 && (
+          <div className="meter-pace" style={{ insetInlineStart: `${pace}%` }} />
+        )}
       </div>
       <div className="meter-note">{note}</div>
     </div>

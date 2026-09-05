@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { api, type Company, type Promotion } from '../lib/api';
 import { shortDate, today } from '../lib/format';
+import { useT } from '../lib/i18n';
 import { Empty, Screen, Skeleton } from '../components/Layout';
 
 export default function Promotions() {
+  const t = useT();
   const [promotions, setPromotions] = useState<Promotion[] | null>(null);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [error, setError] = useState('');
@@ -21,10 +23,10 @@ export default function Promotions() {
   const isLive = (promotion: Promotion) => promotion.from <= today() && promotion.to >= today();
 
   return (
-    <Screen title="Promotions" back>
+    <Screen title={t('promotions')} back>
       {error && <div className="alert error">{error}</div>}
       {!promotions && !error && <Skeleton height={96} count={3} />}
-      {promotions && promotions.length === 0 && <Empty text="No promotions running." />}
+      {promotions && promotions.length === 0 && <Empty text={t('noPromotions')} />}
 
       <div className="list">
         {promotions?.map((promotion) => (

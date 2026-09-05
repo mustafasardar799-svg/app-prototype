@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api, OfflineQueuedError, type Company, type Customer, type Product } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { money, today } from '../lib/format';
+import { customerTypeKey, useT } from '../lib/i18n';
 import { Screen, Skeleton } from '../components/Layout';
 import { SignaturePad } from '../components/SignaturePad';
 import { useToast } from '../components/Toast';
@@ -18,6 +19,7 @@ interface Draft {
 
 export default function OrderForm() {
   const { user } = useAuth();
+  const t = useT();
   const toast = useToast();
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -79,29 +81,33 @@ export default function OrderForm() {
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setError('');
-    if (!customerId) return setError('Choose a customer first');
-    if (lines.length === 0) return setError('Add at least one product');
+    if (!customerId) return setError(t('chooseCustomerFirst'));
+    if (lines.length === 0) return setError(t('addAtLeastOneProduct'));
 
     setSaving(true);
     try {
       const saved = await api.createOrder({
         customerId: Number(customerId), type, date, note, lines, signature, signedBy,
       });
-      toast(`${type === 'return' ? 'Return' : 'Order'} saved`);
+      toast(type === 'return' ? t('returnSaved') : t('orderSaved'));
       navigate(`/orders/${saved.id}`, { replace: true });
     } catch (err) {
       if (err instanceof OfflineQueuedError) {
         // Queued on the phone — the rep can carry on to the next customer.
-        toast(err.message, 'info');
+        toast(t('savedOnPhone', { label: t(err.labelKey as Parameters<typeof t>[0]) }), 'info');
         navigate('/orders', { replace: true });
         return;
       }
-      setError(err instanceof Error ? err.message : 'Could not save');
+      setError(err instanceof Error ? err.message : t('couldNotSave'));
       setSaving(false);
     }
   }
 
-  const title = type === 'return' ? 'New Return' : bonusMode ? 'New Bonus Order' : 'New Order';
+  const title = type === 'return'
+    ? t('newReturnTitle')
+    : bonusMode
+      ? t('newBonusOrderTitle')
+      : t('newOrderTitle');
 
   return (
     <Screen title={title} back>
@@ -113,15 +119,15 @@ export default function OrderForm() {
 
           <div className="card">
             <div className="field">
-              <label htmlFor="customer">Customer</label>
+              <label htmlFor="customer">{t('customer')}</label>
               <select
                 id="customer" className="control" value={customerId}
                 onChange={(event) => setCustomerId(event.target.value)} required
               >
-                <option value="">Select customer…</option>
+                <option value="">{t('selectCustomer')}</option>
                 {customers.map((customer) => (
                   <option key={customer.id} value={customer.id}>
-                    {customer.name} · {customer.type}
+                    {customer.name} · {t(customerTypeKey(customer.type))}
                   </option>
                 ))}
               </select>
@@ -129,19 +135,19 @@ export default function OrderForm() {
 
             <div className="field-row">
               <div className="field">
-                <label htmlFor="date">Date</label>
+                <label htmlFor="date">{t('date')}</label>
                 <input
                   id="date" type="date" className="control" value={date}
                   onChange={(event) => setDate(event.target.value)}
                 />
               </div>
               <div className="field">
-                <label htmlFor="company">Company</label>
+                <label htmlFor="company">{t('company')}</label>
                 <select
                   id="company" className="control" value={companyId}
                   onChange={(event) => setCompanyId(event.target.value)}
                 >
-                  <option value="">All</option>
+                  <option value="">{t('all')}</option>
                   {companies.map((company) => (
                     <option key={company.id} value={company.id}>{company.name}</option>
                   ))}
@@ -150,15 +156,15 @@ export default function OrderForm() {
             </div>
           </div>
 
-          <div className="section-title">Products</div>
+          <div className="section-title">{t('products')}</div>
           <div className="card">
             <div className="field" style={{ marginBottom: lines.length ? 12 : 0 }}>
-              <label htmlFor="picker">Add product</label>
+              <label htmlFor="picker">{t('addProduct')}</label>
               <select
                 id="picker" className="control" value={picking}
                 onChange={(event) => event.target.value && addLine(Number(event.target.value))}
               >
-                <option value="">Choose a product…</option>
+                <option value="">{t('chooseProduct')}</option>
                 {selectable.map((product) => (
                   <option key={product.id} value={product.id}>
                     {product.name} — {money(product.price, user?.currency)}
@@ -191,48 +197,48 @@ export default function OrderForm() {
                       </button>
                     </div>
                     <NumberBox
-                      label="Qty" value={line.qty} min={1}
+                      label={t('qty')} value={line.qty} min={1}
                       onChange={(value) => patchLine(line.productId, { qty: value })}
                     />
                     <NumberBox
-                      label="Bonus" value={line.bonus} min={0}
+                      label={t('bonusShort')} value={line.bonus} min={0}
                       onChange={(value) => patchLine(line.productId, { bonus: value })}
                     />
                     <NumberBox
-                      label="Price" value={line.price} min={0} step={0.25}
+                      label={t('price')} value={line.price} min={0} step={0.25}
                       onChange={(value) => patchLine(line.productId, { price: value })}
                     />
                     <NumberBox
-                      label="Disc %" value={line.discount} min={0} max={100}
+                      label={t('discount')} value={line.discount} min={0} max={100}
                       onChange={(value) => patchLine(line.productId, { discount: value })}
                     />
                   </div>
                 );
               })}
-              {lines.length === 0 && <p className="muted" style={{ margin: 0, fontSize: 13 }}>No products added yet.</p>}
+              {lines.length === 0 && <p className="muted" style={{ margin: 0, fontSize: 13 }}>{t('noProductsAdded')}</p>}
             </div>
           </div>
 
           <div className="field" style={{ marginTop: 12 }}>
-            <label htmlFor="note">Note</label>
+            <label htmlFor="note">{t('note')}</label>
             <textarea
               id="note" className="control" value={note}
-              onChange={(event) => setNote(event.target.value)} placeholder="Optional"
+              onChange={(event) => setNote(event.target.value)} placeholder={t('optional')}
             />
           </div>
 
           <div className="section-title">
-            <span><IconPen size={13} /> Customer signature</span>
-            <span className="muted" style={{ textTransform: 'none', letterSpacing: 0 }}>Optional</span>
+            <span><IconPen size={13} /> {t('customerSignature')}</span>
+            <span className="muted" style={{ textTransform: 'none', letterSpacing: 0 }}>{t('optional')}</span>
           </div>
           <div className="card">
             <SignaturePad onChange={setSignature} />
             {signature && (
               <div className="field" style={{ marginTop: 12, marginBottom: 0 }}>
-                <label htmlFor="signedBy">Signed by</label>
+                <label htmlFor="signedBy">{t('signedBy')}</label>
                 <input
                   id="signedBy" className="control" value={signedBy}
-                  placeholder="Name of the person signing"
+                  placeholder={t('nameOfSigner')}
                   onChange={(event) => setSignedBy(event.target.value)}
                 />
               </div>
@@ -242,16 +248,17 @@ export default function OrderForm() {
           <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <div className="muted" style={{ fontSize: 12.5 }}>
-                {lines.length} line{lines.length === 1 ? '' : 's'}
-                {bonusUnits > 0 ? ` · ${bonusUnits} bonus unit${bonusUnits === 1 ? '' : 's'}` : ''}
+                {lines.length} {lines.length === 1 ? t('line') : t('lines')}
+                {bonusUnits > 0 ? ` · ${bonusUnits} ${bonusUnits === 1 ? t('bonusUnit') : t('bonusUnits')}` : ''}
               </div>
               <div style={{ fontSize: 22, fontWeight: 800 }}>{money(total, user?.currency)}</div>
             </div>
-            <span className={`pill ${type === 'return' ? 'return' : ''}`}>{type}</span>
+            <span className={`pill ${type === 'return' ? 'return' : ''}`}>{t(type === 'return' ? 'return' : 'order')}</span>
           </div>
 
           <button className="btn" style={{ marginTop: 14 }} disabled={saving}>
-            <IconPlus size={18} /> {saving ? 'Saving…' : `Save ${type}`}
+            <IconPlus size={18} />{' '}
+            {saving ? t('saving') : type === 'return' ? t('saveReturn') : t('saveOrder')}
           </button>
         </form>
       )}
