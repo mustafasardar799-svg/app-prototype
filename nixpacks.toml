@@ -1,9 +1,14 @@
 # Railway builds with Nixpacks. Node 20+ is required for the server's ESM setup.
+#
+# --include=dev matters: Nixpacks sets NODE_ENV=production, and npm then skips
+# devDependencies. Vite, TypeScript and the React types live there and are
+# needed to build the client, so without it the build fails with
+# "JSX element implicitly has type 'any'" or "vite: not found".
 [phases.setup]
 nixPkgs = ["nodejs_22"]
 
 [phases.install]
-cmds = ["npm install"]
+cmds = ["npm install --include=dev"]
 
 [phases.build]
 cmds = ["npm run build"]
