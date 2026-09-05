@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, type Company, type Promotion } from '../lib/api';
 import { shortDate, today } from '../lib/format';
-import { Empty, Screen, Spinner } from '../components/Layout';
+import { Empty, Screen, Skeleton } from '../components/Layout';
 
 export default function Promotions() {
   const [promotions, setPromotions] = useState<Promotion[] | null>(null);
@@ -23,7 +23,7 @@ export default function Promotions() {
   return (
     <Screen title="Promotions" back>
       {error && <div className="alert error">{error}</div>}
-      {!promotions && !error && <Spinner />}
+      {!promotions && !error && <Skeleton height={96} count={3} />}
       {promotions && promotions.length === 0 && <Empty text="No promotions running." />}
 
       <div className="list">

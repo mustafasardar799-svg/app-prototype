@@ -4,10 +4,18 @@ import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { initials, roleLabel } from '../lib/format';
 import { Screen } from '../components/Layout';
-import { IconCheck, IconEdit, IconLogout, IconTrash } from '../components/Icons';
+import { ConfirmSheet } from '../components/Sheet';
+import { useToast } from '../components/Toast';
+import { useTheme, type ThemeChoice } from '../lib/theme';
+import { useConnection } from '../lib/connection';
+import { money } from '../lib/format';
+import { IconCheck, IconEdit, IconInbox, IconLogout, IconMoon, IconSun, IconTarget, IconTrash } from '../components/Icons';
 
 export default function Profile() {
   const { user, refresh, signOut } = useAuth();
+  const toast = useToast();
+  const { choice, setChoice } = useTheme();
+  const { online, queue, sync } = useConnection();
   const [params, setParams] = useSearchParams();
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({ name: '', phone: '', currency: '' });
@@ -28,7 +36,7 @@ export default function Profile() {
       await api.updateMe(form);
       await refresh();
       setEditing(false);
-      setMessage({ kind: 'ok', text: 'Profile updated' });
+      toast('Profile updated');
     } catch (err) {
       setMessage({ kind: 'error', text: err instanceof Error ? err.message : 'Could not update' });
     } finally {
@@ -43,7 +51,7 @@ export default function Profile() {
     try {
       await api.changePassword(passwords);
       setPasswords({ currentPassword: '', newPassword: '' });
-      setMessage({ kind: 'ok', text: 'Password changed' });
+      toast('Password changed');
     } catch (err) {
       setMessage({ kind: 'error', text: err instanceof Error ? err.message : 'Could not change password' });
     } finally {
@@ -131,8 +139,67 @@ export default function Profile() {
           <InfoRow label="Phone" value={user?.phone || '—'} />
           <InfoRow label="User Name" value={user?.username || '—'} />
           <InfoRow label="Currency" value={user?.currency || 'IQD'} />
+          {user?.target ? (
+            <div className="row" style={{ display: 'block' }}>
+              <div className="muted" style={{ fontSize: 12.5 }}>
+                <IconTarget size={13} /> Monthly target
+              </div>
+              <div style={{ fontWeight: 600, marginTop: 2 }}>{money(user.target, user.currency)}</div>
+            </div>
+          ) : null}
         </div>
       )}
+
+      <div className="section-title">Appearance</div>
+      <div className="card">
+        <div className="toggle">
+          {([
+            { key: 'system', label: 'System' },
+            { key: 'light', label: 'Light' },
+            { key: 'dark', label: 'Dark' },
+          ] as { key: ThemeChoice; label: string }[]).map((option) => (
+            <button
+              key={option.key}
+              type="button"
+              className={choice === option.key ? 'on' : ''}
+              onClick={() => setChoice(option.key)}
+            >
+              {option.key === 'dark' ? <IconMoon size={15} /> : option.key === 'light' ? <IconSun size={15} /> : null}
+              {option.label}
+            </button>
+          ))}
+        </div>
+        <p className="muted" style={{ fontSize: 12.5, margin: '10px 0 0' }}>
+          System follows your iPhone's Display setting.
+        </p>
+      </div>
+
+      <div className="section-title">Sync</div>
+      <div className="card">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+          <IconInbox size={19} />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 600 }}>
+              {queue.length === 0
+                ? 'Everything is synced'
+                : `${queue.length} record${queue.length === 1 ? '' : 's'} waiting`}
+            </div>
+            <div className="muted" style={{ fontSize: 12.5 }}>
+              {online ? 'Connected' : 'No connection — work is saved on this phone'}
+            </div>
+          </div>
+          {queue.length > 0 && online && (
+            <button className="btn small ghost" onClick={() => void sync()}>Sync now</button>
+          )}
+        </div>
+        {queue.length > 0 && (
+          <ul className="muted" style={{ fontSize: 12.5, margin: '10px 0 0', paddingLeft: 18 }}>
+            {queue.slice(0, 5).map((entry) => (
+              <li key={entry.id}>{entry.label}</li>
+            ))}
+          </ul>
+        )}
+      </div>
 
       <div className="section-title">Change password</div>
       <form className="card" onSubmit={changePassword}>
@@ -158,23 +225,19 @@ export default function Profile() {
       </form>
 
       <div className="section-title">Account</div>
-      {confirmingDelete ? (
-        <div className="card">
-          <p style={{ marginTop: 0 }}>
-            Deleting your account signs you out and hides it from the app. Your recorded sales stay
-            in the company reports.
-          </p>
-          <div className="sheet-actions">
-            <button className="btn ghost" onClick={dismissDelete}>Cancel</button>
-            <button className="btn danger" onClick={deleteAccount} disabled={busy}>
-              <IconTrash size={18} /> Delete account
-            </button>
-          </div>
-        </div>
-      ) : (
-        <button className="btn danger" onClick={() => setConfirmingDelete(true)}>
-          <IconTrash size={18} /> Delete Account
-        </button>
+      <button className="btn danger" onClick={() => setConfirmingDelete(true)}>
+        <IconTrash size={18} /> Delete Account
+      </button>
+
+      {confirmingDelete && (
+        <ConfirmSheet
+          title="Delete your account?"
+          message="You will be signed out and your account hidden from the app. The sales you recorded stay in the company reports."
+          confirmLabel="Delete account"
+          onConfirm={deleteAccount}
+          onCancel={dismissDelete}
+          busy={busy}
+        />
       )}
 
       <button className="btn ghost" style={{ marginTop: 10 }} onClick={signOut}>

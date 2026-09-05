@@ -1,17 +1,22 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  api, type Company, type Customer, type Product, type SalesReport, type User, type Zone,
+  api, type Company, type Customer, type Product, type SalesReport, type TrendPoint,
+  type User, type Zone,
 } from '../lib/api';
 import { useAuth, isManagerial } from '../lib/auth';
 import { daysAgo, money, shortDate, today } from '../lib/format';
-import { Empty, Screen, Spinner } from '../components/Layout';
-import { IconSearch } from '../components/Icons';
+import { Empty, Screen, Skeleton } from '../components/Layout';
+import { TrendChart } from '../components/Charts';
+import { useToast } from '../components/Toast';
+import { shareCsv } from '../lib/export';
+import { IconChart, IconSearch, IconShare } from '../components/Icons';
 
 const customerTypes = ['all', 'pharmacy', 'doctor', 'hospital', 'store'];
 
 export default function Report() {
   const { user } = useAuth();
+  const toast = useToast();
   const [params] = useSearchParams();
   const [filters, setFilters] = useState({
     // The team screen deep-links here with a staff member already chosen.
@@ -33,20 +38,22 @@ export default function Report() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [report, setReport] = useState<SalesReport | null>(null);
+  const [trend, setTrend] = useState<TrendPoint[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     Promise.all([
       isManagerial(user) ? api.staff() : Promise.resolve([]),
-      api.companies(), api.zones(), api.customers(), api.products(),
+      api.companies(), api.zones(), api.customers(), api.products(), api.trend(6),
     ])
-      .then(([loadedStaff, loadedCompanies, loadedZones, loadedCustomers, loadedProducts]) => {
+      .then(([loadedStaff, loadedCompanies, loadedZones, loadedCustomers, loadedProducts, loadedTrend]) => {
         setStaff(loadedStaff);
         setCompanies(loadedCompanies);
         setZones(loadedZones);
         setCustomers(loadedCustomers);
         setProducts(loadedProducts);
+        setTrend(loadedTrend);
       })
       .catch((err) => setError(err.message));
   }, [user]);
@@ -70,12 +77,49 @@ export default function Report() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  async function exportCsv() {
+    if (!report || report.rows.length === 0) return;
+    const header =
+      report.reportType === 'product'
+        ? ['Product', 'Company', 'Qty', 'Bonus', 'Returned', 'Total']
+        : ['Code', 'Staff', 'Customer', 'Date', 'Type', 'Items', 'Total'];
+    const body = report.rows.map((row) =>
+      report.reportType === 'product'
+        ? [row.product, row.company, row.qty, row.bonus, row.returned, row.total]
+        : [row.code, row.staff, row.customer, row.date, row.type, row.items, row.total],
+    ) as (string | number)[][];
+
+    const result = await shareCsv(
+      `eliavit-sales-${filters.from}-to-${filters.to}.csv`,
+      [header, ...body, [], ['Net sales', report.summary.netTotal], ['Gross sales', report.summary.salesTotal], ['Returns', report.summary.returnsTotal]],
+    );
+    if (result === 'downloaded') toast('CSV downloaded');
+    if (result === 'shared') toast('CSV shared');
+  }
+
   const set = (key: keyof typeof filters) => (
     event: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>,
   ) => setFilters((prev) => ({ ...prev, [key]: event.target.value }));
 
   return (
-    <Screen title="Sales Report" back>
+    <Screen
+      title="Sales Report"
+      back
+      action={
+        report && report.rows.length > 0 ? (
+          <button className="icon-btn" onClick={exportCsv} aria-label="Export as CSV">
+            <IconShare />
+          </button>
+        ) : undefined
+      }
+    >
+      {trend.length > 0 && (
+        <div className="card" style={{ marginBottom: 12 }}>
+          <div className="section-title" style={{ margin: '0 0 6px' }}>Net sales, last 6 months</div>
+          <TrendChart data={trend} currency={user?.currency} />
+        </div>
+      )}
+
       <div className="card">
         {isManagerial(user) && (
           <Select label="Staff" value={filters.userId} onChange={set('userId')}
@@ -145,7 +189,7 @@ export default function Report() {
       </div>
 
       {error && <div className="alert error" style={{ marginTop: 14 }}>{error}</div>}
-      {loading && <Spinner />}
+      {loading && <Skeleton height={80} count={3} />}
 
       {report && !loading && (
         <>
@@ -162,7 +206,11 @@ export default function Report() {
           </div>
 
           {report.rows.length === 0 ? (
-            <Empty text="No sales match these filters." />
+            <Empty
+              icon={<IconChart size={26} />}
+              headline="Nothing matches"
+              text="Widen the date range or clear a filter to see results."
+            />
           ) : (
             <div className="card table-wrap">
               {report.reportType === 'product' ? (
@@ -220,6 +268,12 @@ export default function Report() {
                 </table>
               )}
             </div>
+          )}
+
+          {report.rows.length > 0 && (
+            <button className="btn ghost" style={{ marginTop: 12 }} onClick={exportCsv}>
+              <IconShare size={18} /> Export this report as CSV
+            </button>
           )}
         </>
       )}

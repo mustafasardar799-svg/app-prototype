@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { api, type Company, type Customer, type Product } from '../lib/api';
+import { api, OfflineQueuedError, type Company, type Customer, type Product } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { money, today } from '../lib/format';
-import { Screen, Spinner } from '../components/Layout';
-import { IconPlus, IconTrash } from '../components/Icons';
+import { Screen, Skeleton } from '../components/Layout';
+import { SignaturePad } from '../components/SignaturePad';
+import { useToast } from '../components/Toast';
+import { IconPen, IconPlus, IconTrash } from '../components/Icons';
 
 interface Draft {
   productId: number;
@@ -16,6 +18,7 @@ interface Draft {
 
 export default function OrderForm() {
   const { user } = useAuth();
+  const toast = useToast();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const type = params.get('type') === 'return' ? 'return' : 'order';
@@ -34,6 +37,8 @@ export default function OrderForm() {
   const [picking, setPicking] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [signature, setSignature] = useState('');
+  const [signedBy, setSignedBy] = useState('');
 
   useEffect(() => {
     Promise.all([api.customers(), api.products(), api.companies()])
@@ -79,9 +84,18 @@ export default function OrderForm() {
 
     setSaving(true);
     try {
-      const saved = await api.createOrder({ customerId: Number(customerId), type, date, note, lines });
+      const saved = await api.createOrder({
+        customerId: Number(customerId), type, date, note, lines, signature, signedBy,
+      });
+      toast(`${type === 'return' ? 'Return' : 'Order'} saved`);
       navigate(`/orders/${saved.id}`, { replace: true });
     } catch (err) {
+      if (err instanceof OfflineQueuedError) {
+        // Queued on the phone — the rep can carry on to the next customer.
+        toast(err.message, 'info');
+        navigate('/orders', { replace: true });
+        return;
+      }
       setError(err instanceof Error ? err.message : 'Could not save');
       setSaving(false);
     }
@@ -92,7 +106,7 @@ export default function OrderForm() {
   return (
     <Screen title={title} back>
       {loading ? (
-        <Spinner />
+        <Skeleton height={120} count={3} />
       ) : (
         <form onSubmit={submit}>
           {error && <div className="alert error">{error}</div>}
@@ -205,6 +219,24 @@ export default function OrderForm() {
               id="note" className="control" value={note}
               onChange={(event) => setNote(event.target.value)} placeholder="Optional"
             />
+          </div>
+
+          <div className="section-title">
+            <span><IconPen size={13} /> Customer signature</span>
+            <span className="muted" style={{ textTransform: 'none', letterSpacing: 0 }}>Optional</span>
+          </div>
+          <div className="card">
+            <SignaturePad onChange={setSignature} />
+            {signature && (
+              <div className="field" style={{ marginTop: 12, marginBottom: 0 }}>
+                <label htmlFor="signedBy">Signed by</label>
+                <input
+                  id="signedBy" className="control" value={signedBy}
+                  placeholder="Name of the person signing"
+                  onChange={(event) => setSignedBy(event.target.value)}
+                />
+              </div>
+            )}
           </div>
 
           <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

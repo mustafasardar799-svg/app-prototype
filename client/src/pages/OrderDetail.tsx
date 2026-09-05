@@ -3,17 +3,21 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { api, type Customer, type Order, type Product } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { money, shortDate } from '../lib/format';
-import { Screen, Spinner } from '../components/Layout';
-import { IconTrash } from '../components/Icons';
+import { Screen, Skeleton } from '../components/Layout';
+import { ConfirmSheet } from '../components/Sheet';
+import { useToast } from '../components/Toast';
+import { IconPen, IconTrash } from '../components/Icons';
 
 export default function OrderDetail() {
   const { id } = useParams();
   const { user } = useAuth();
+  const toast = useToast();
   const navigate = useNavigate();
   const [order, setOrder] = useState<Order | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [error, setError] = useState('');
+  const [confirming, setConfirming] = useState(false);
 
   useEffect(() => {
     Promise.all([api.order(Number(id)), api.customers(), api.products()])
@@ -26,12 +30,14 @@ export default function OrderDetail() {
   }, [id]);
 
   async function destroy() {
-    if (!order || !confirm('Delete this record? This cannot be undone.')) return;
+    if (!order) return;
     try {
       await api.deleteOrder(order.id);
+      toast('Record deleted');
       navigate('/orders', { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not delete');
+      setConfirming(false);
+      toast(err instanceof Error ? err.message : 'Could not delete', 'error');
     }
   }
 
@@ -41,14 +47,14 @@ export default function OrderDetail() {
       back
       action={
         order && (
-          <button className="icon-btn" onClick={destroy} aria-label="Delete record">
+          <button className="icon-btn" onClick={() => setConfirming(true)} aria-label="Delete record">
             <IconTrash />
           </button>
         )
       }
     >
       {error && <div className="alert error">{error}</div>}
-      {!order && !error && <Spinner />}
+      {!order && !error && <Skeleton height={90} count={3} />}
 
       {order && (
         <>
@@ -107,10 +113,33 @@ export default function OrderDetail() {
             </>
           )}
 
+          {order.signature && (
+            <>
+              <div className="section-title">
+                <span><IconPen size={13} /> Signature</span>
+              </div>
+              <div className="card">
+                <img className="sig-preview" src={order.signature} alt="Customer signature" />
+                {order.signedBy && (
+                  <div className="muted" style={{ fontSize: 12.5, marginTop: 6 }}>Signed by {order.signedBy}</div>
+                )}
+              </div>
+            </>
+          )}
+
           <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span className="muted">Total</span>
             <strong style={{ fontSize: 21 }}>{money(order.total, user?.currency)}</strong>
           </div>
+
+          {confirming && (
+            <ConfirmSheet
+              title="Delete this record?"
+              message="It disappears from your records and from your manager's reports. This cannot be undone."
+              onConfirm={destroy}
+              onCancel={() => setConfirming(false)}
+            />
+          )}
         </>
       )}
     </Screen>

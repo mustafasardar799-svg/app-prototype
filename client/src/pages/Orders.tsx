@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api, type Customer, type Order, type User } from '../lib/api';
 import { useAuth, isManagerial } from '../lib/auth';
 import { money, shortDate } from '../lib/format';
-import { Empty, Screen, Spinner } from '../components/Layout';
+import { Empty, Screen, Skeleton } from '../components/Layout';
 import { IconOrder, IconPlus, IconReturn } from '../components/Icons';
 
 export default function Orders() {
@@ -70,7 +70,7 @@ export default function Orders() {
       </div>
 
       {error && <div className="alert error">{error}</div>}
-      {!orders && !error && <Spinner />}
+      {!orders && !error && <Skeleton height={72} count={5} />}
       {orders && orders.length === 0 && <Empty text="No records for this filter yet." />}
 
       <div className="list">

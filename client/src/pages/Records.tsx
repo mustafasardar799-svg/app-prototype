@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { api, type Customer } from '../lib/api';
+import { api, OfflineQueuedError, type Customer, type Visit } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { money, shortDate, today } from '../lib/format';
-import { Empty, Screen, Spinner } from '../components/Layout';
-import { IconPlus, IconTrash } from '../components/Icons';
+import { Empty, Screen, Skeleton } from '../components/Layout';
+import { ConfirmSheet, Sheet } from '../components/Sheet';
+import { useToast } from '../components/Toast';
+import {
+  IconCalendar, IconCheck, IconExpense, IconMoney, IconPhone, IconPin, IconPlus, IconTrash,
+} from '../components/Icons';
 
 interface FieldSpec {
   key: string;
@@ -24,7 +28,10 @@ interface Row {
 
 interface RecordConfig {
   title: string;
+  addTitle: string;
+  emptyHeadline: string;
   emptyText: string;
+  icon: ReactNode;
   fields: FieldSpec[];
   initial: Record<string, string>;
   list: () => Promise<unknown[]>;
@@ -33,6 +40,7 @@ interface RecordConfig {
   primary: (row: Row, customerName: (id?: number) => string) => string;
   secondary: (row: Row) => string;
   trailing?: (row: Row, currency?: string) => ReactNode;
+  extra?: (row: Row, reload: () => Promise<void>) => ReactNode;
 }
 
 /**
@@ -42,23 +50,28 @@ interface RecordConfig {
  */
 function RecordScreen({ config }: { config: RecordConfig }) {
   const { user } = useAuth();
+  const toast = useToast();
   const [rows, setRows] = useState<Row[] | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState(config.initial);
+  const [confirming, setConfirming] = useState<Row | null>(null);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const reload = () =>
-    config.list()
-      .then((loaded) => setRows(loaded as Row[]))
-      .catch((err) => setError(err.message));
+  const reload = async () => {
+    try {
+      setRows((await config.list()) as Row[]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not load');
+    }
+  };
 
   useEffect(() => {
     setRows(null);
     setForm(config.initial);
     setAdding(false);
-    reload();
+    void reload();
     api.customers().then(setCustomers).catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.title]);
@@ -71,26 +84,38 @@ function RecordScreen({ config }: { config: RecordConfig }) {
   async function save(event: React.FormEvent) {
     event.preventDefault();
     setSaving(true);
-    setError('');
     try {
       await config.create(form);
       setForm(config.initial);
       setAdding(false);
+      toast('Saved');
       await reload();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save');
+      if (err instanceof OfflineQueuedError) {
+        // The write is parked on the phone; treat it as a success for the user.
+        setForm(config.initial);
+        setAdding(false);
+        toast(err.message, 'info');
+      } else {
+        toast(err instanceof Error ? err.message : 'Could not save', 'error');
+      }
     } finally {
       setSaving(false);
     }
   }
 
-  async function destroy(row: Row) {
-    if (!confirm('Delete this record?')) return;
+  async function destroy() {
+    if (!confirming) return;
+    setSaving(true);
     try {
-      await config.remove(row.id);
+      await config.remove(confirming.id);
+      setConfirming(null);
+      toast('Deleted');
       await reload();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not delete');
+      toast(err instanceof Error ? err.message : 'Could not delete', 'error');
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -98,84 +123,114 @@ function RecordScreen({ config }: { config: RecordConfig }) {
     <Screen
       title={config.title}
       action={
-        <button className="icon-btn" onClick={() => setAdding(!adding)} aria-label={`Add ${config.title}`}>
+        <button className="icon-btn" onClick={() => setAdding(true)} aria-label={`Add ${config.title}`}>
           <IconPlus />
         </button>
       }
     >
       {error && <div className="alert error">{error}</div>}
 
-      {adding && (
-        <form className="card" onSubmit={save} style={{ marginBottom: 14 }}>
-          {config.fields.map((field) => (
-            <div className="field" key={field.key}>
-              <label htmlFor={field.key}>{field.label}</label>
-              {field.type === 'customer' ? (
-                <select
-                  id={field.key} className="control" required={field.required}
-                  value={form[field.key] || ''}
-                  onChange={(event) => setForm({ ...form, [field.key]: event.target.value })}
-                >
-                  <option value="">Select customer…</option>
-                  {customers.map((customer) => (
-                    <option key={customer.id} value={customer.id}>{customer.name}</option>
-                  ))}
-                </select>
-              ) : field.type === 'select' ? (
-                <select
-                  id={field.key} className="control" value={form[field.key] || ''}
-                  onChange={(event) => setForm({ ...form, [field.key]: event.target.value })}
-                >
-                  {(field.options || []).map((option) => (
-                    <option key={option} value={option}>{option}</option>
-                  ))}
-                </select>
-              ) : field.type === 'textarea' ? (
-                <textarea
-                  id={field.key} className="control" value={form[field.key] || ''}
-                  placeholder={field.placeholder}
-                  onChange={(event) => setForm({ ...form, [field.key]: event.target.value })}
-                />
-              ) : (
-                <input
-                  id={field.key} className="control" type={field.type}
-                  inputMode={field.type === 'number' ? 'decimal' : undefined}
-                  required={field.required} placeholder={field.placeholder}
-                  value={form[field.key] || ''}
-                  onChange={(event) => setForm({ ...form, [field.key]: event.target.value })}
-                />
-              )}
-            </div>
-          ))}
-          <div className="sheet-actions">
-            <button className="btn ghost" type="button" onClick={() => setAdding(false)}>Cancel</button>
-            <button className="btn" disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
-          </div>
-        </form>
+      {!rows && !error && <Skeleton height={68} count={4} />}
+      {rows && rows.length === 0 && (
+        <div className="card">
+          <Empty icon={config.icon} headline={config.emptyHeadline} text={config.emptyText} />
+          <button className="btn" onClick={() => setAdding(true)}>
+            <IconPlus size={18} /> {config.addTitle}
+          </button>
+        </div>
       )}
-
-      {!rows && !error && <Spinner />}
-      {rows && rows.length === 0 && <Empty text={config.emptyText} />}
 
       <div className="list">
         {rows?.map((row) => (
-          <div key={row.id} className="row">
-            <span className="grow">
-              <span className="title">{config.primary(row, customerName)}</span>
-              <span className="sub">
-                {shortDate(row.date)} · {config.secondary(row)}
+          <div key={row.id} className="card" style={{ padding: 0 }}>
+            <div className="row" style={{ boxShadow: 'none', background: 'transparent' }}>
+              <span className="grow">
+                <span className="title">{config.primary(row, customerName)}</span>
+                <span className="sub">
+                  {shortDate(row.date)} · {config.secondary(row)}
+                </span>
               </span>
-            </span>
-            {config.trailing?.(row, user?.currency)}
-            <button
-              className="icon-btn" style={{ color: 'var(--danger)' }}
-              onClick={() => destroy(row)} aria-label="Delete record"
-            >
-              <IconTrash size={18} />
-            </button>
+              {config.trailing?.(row, user?.currency)}
+              <button
+                className="icon-btn"
+                style={{ color: 'var(--danger)' }}
+                onClick={() => setConfirming(row)}
+                aria-label="Delete record"
+              >
+                <IconTrash size={18} />
+              </button>
+            </div>
+            {config.extra?.(row, reload)}
           </div>
         ))}
       </div>
+
+      {rows && rows.length > 0 && (
+        <button className="btn" style={{ marginTop: 14 }} onClick={() => setAdding(true)}>
+          <IconPlus size={18} /> {config.addTitle}
+        </button>
+      )}
+
+      {adding && (
+        <Sheet title={config.addTitle} onClose={() => setAdding(false)}>
+          <form onSubmit={save}>
+            {config.fields.map((field) => (
+              <div className="field" key={field.key}>
+                <label htmlFor={field.key}>{field.label}</label>
+                {field.type === 'customer' ? (
+                  <select
+                    id={field.key} className="control" required={field.required}
+                    value={form[field.key] || ''}
+                    onChange={(event) => setForm({ ...form, [field.key]: event.target.value })}
+                  >
+                    <option value="">Select customer…</option>
+                    {customers.map((customer) => (
+                      <option key={customer.id} value={customer.id}>{customer.name}</option>
+                    ))}
+                  </select>
+                ) : field.type === 'select' ? (
+                  <select
+                    id={field.key} className="control" value={form[field.key] || ''}
+                    onChange={(event) => setForm({ ...form, [field.key]: event.target.value })}
+                  >
+                    {(field.options || []).map((option) => (
+                      <option key={option} value={option}>{option}</option>
+                    ))}
+                  </select>
+                ) : field.type === 'textarea' ? (
+                  <textarea
+                    id={field.key} className="control" value={form[field.key] || ''}
+                    placeholder={field.placeholder}
+                    onChange={(event) => setForm({ ...form, [field.key]: event.target.value })}
+                  />
+                ) : (
+                  <input
+                    id={field.key} className="control" type={field.type}
+                    inputMode={field.type === 'number' ? 'decimal' : undefined}
+                    required={field.required} placeholder={field.placeholder}
+                    value={form[field.key] || ''}
+                    onChange={(event) => setForm({ ...form, [field.key]: event.target.value })}
+                  />
+                )}
+              </div>
+            ))}
+            <div className="sheet-actions">
+              <button className="btn ghost" type="button" onClick={() => setAdding(false)}>Cancel</button>
+              <button className="btn" disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
+            </div>
+          </form>
+        </Sheet>
+      )}
+
+      {confirming && (
+        <ConfirmSheet
+          title="Delete record?"
+          message="This removes it from your records and from your manager's reports."
+          onConfirm={destroy}
+          onCancel={() => setConfirming(null)}
+          busy={saving}
+        />
+      )}
     </Screen>
   );
 }
@@ -187,7 +242,10 @@ export function Expenses() {
     <RecordScreen
       config={{
         title: 'Expenses',
-        emptyText: 'No expenses recorded yet.',
+        addTitle: 'Add expense',
+        icon: <IconExpense size={26} />,
+        emptyHeadline: 'No expenses yet',
+        emptyText: 'Log fuel, meals and travel as you spend, so month-end needs no receipts hunt.',
         initial: { date: today(), category: 'Fuel', amount: '', note: '' },
         fields: [
           { key: 'date', label: 'Date', type: 'date' },
@@ -211,7 +269,10 @@ export function Collections() {
     <RecordScreen
       config={{
         title: 'Money Collector',
-        emptyText: 'No collections recorded yet.',
+        addTitle: 'Record collection',
+        icon: <IconMoney size={26} />,
+        emptyHeadline: 'Nothing collected yet',
+        emptyText: 'Record cash and transfers as customers settle their invoices.',
         initial: { date: today(), customerId: '', amount: '', invoiceNo: '', note: '' },
         fields: [
           { key: 'date', label: 'Date', type: 'date' },
@@ -226,7 +287,7 @@ export function Collections() {
         primary: (row, customerName) => customerName(row.customerId),
         secondary: (row) => String(row.invoiceNo || row.note || 'No invoice'),
         trailing: (row, currency) => (
-          <span className="amount" style={{ color: 'var(--success)' }}>
+          <span className="amount" style={{ color: 'var(--good)' }}>
             {money(Number(row.amount), currency)}
           </span>
         ),
@@ -240,22 +301,107 @@ export function Visits() {
     <RecordScreen
       config={{
         title: 'Visit Plan',
-        emptyText: 'No visits planned yet.',
+        addTitle: 'Plan a visit',
+        icon: <IconCalendar size={26} />,
+        emptyHeadline: 'No visits planned',
+        emptyText: 'Plan your route, then check in at each customer as you arrive.',
         initial: { date: today(), customerId: '', status: 'planned', note: '' },
         fields: [
           { key: 'date', label: 'Date', type: 'date' },
           { key: 'customerId', label: 'Customer', type: 'customer', required: true },
-          { key: 'status', label: 'Status', type: 'select', options: ['planned', 'done'] },
           { key: 'note', label: 'Objective', type: 'textarea', placeholder: 'What is this visit for?' },
         ],
         list: () => api.visits(),
-        create: (body) => api.createVisit(body),
+        create: (body) => api.createVisit({ ...body, status: 'planned' }),
         remove: (id) => api.deleteVisit(id),
         primary: (row, customerName) => customerName(row.customerId),
         secondary: (row) => String(row.note || 'No objective'),
-        trailing: (row) => <span className={`pill ${row.status === 'done' ? 'done' : 'pending'}`}>{String(row.status)}</span>,
+        trailing: (row) => <VisitBadge visit={row as unknown as Visit} />,
+        extra: (row, reload) => <CheckInBar visit={row as unknown as Visit} onDone={reload} />,
       }}
     />
+  );
+}
+
+function VisitBadge({ visit }: { visit: Visit }) {
+  if (visit.status !== 'done') return <span className="pill">planned</span>;
+  if (visit.verified) return <span className="pill good">on site</span>;
+  if (visit.distanceM != null) return <span className="pill warn">off site</span>;
+  return <span className="pill">checked in</span>;
+}
+
+/**
+ * GPS check-in. The phone's coordinates go with the visit so a team leader can
+ * see the rep was actually at the pharmacy, not marking visits from home.
+ */
+function CheckInBar({ visit, onDone }: { visit: Visit; onDone: () => Promise<void> }) {
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+
+  if (visit.status === 'done') {
+    if (visit.distanceM == null) {
+      return (
+        <div style={{ padding: '0 13px 12px', fontSize: 12.5, color: 'var(--ink-soft)' }}>
+          Checked in without location.
+        </div>
+      );
+    }
+    return (
+      <div
+        style={{ padding: '0 13px 12px', fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 6 }}
+        className={visit.verified ? '' : 'muted'}
+      >
+        <IconPin size={14} />
+        {visit.verified
+          ? `Confirmed on site — ${visit.distanceM} m from the customer`
+          : `Checked in ${(visit.distanceM / 1000).toFixed(1)} km from the customer's address`}
+      </div>
+    );
+  }
+
+  const checkIn = () => {
+    setBusy(true);
+    const send = (position?: GeolocationPosition) =>
+      api
+        .checkIn(visit.id, {
+          lat: position?.coords.latitude,
+          lng: position?.coords.longitude,
+          accuracy: position?.coords.accuracy,
+        })
+        .then(async (saved) => {
+          toast(
+            saved.verified
+              ? `Checked in — ${saved.distanceM} m from the customer`
+              : saved.distanceM != null
+                ? `Checked in, but ${(saved.distanceM / 1000).toFixed(1)} km away`
+                : 'Checked in without location',
+            saved.verified ? 'ok' : 'info',
+          );
+          await onDone();
+        })
+        .catch((err) => {
+          toast(err instanceof Error ? err.message : 'Could not check in', 'error');
+        })
+        .finally(() => setBusy(false));
+
+    if (!navigator.geolocation) {
+      void send();
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => void send(position),
+      // Location refused or unavailable: still record the visit, just unverified.
+      () => void send(),
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 },
+    );
+  };
+
+  return (
+    <div style={{ padding: '0 13px 12px' }}>
+      <button className="btn small ghost" onClick={checkIn} disabled={busy}>
+        {busy ? <>Locating…</> : <><IconCheck size={16} /> Check in here</>}
+      </button>
+    </div>
   );
 }
 
@@ -264,7 +410,10 @@ export function Calls() {
     <RecordScreen
       config={{
         title: 'Calls',
-        emptyText: 'No calls logged yet.',
+        addTitle: 'Log a call',
+        icon: <IconPhone size={26} />,
+        emptyHeadline: 'No calls logged',
+        emptyText: 'Record follow-up calls so nothing slips between visits.',
         initial: { date: today(), customerId: '', type: 'follow-up', minutes: '', note: '' },
         fields: [
           { key: 'date', label: 'Date', type: 'date' },

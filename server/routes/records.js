@@ -6,6 +6,28 @@ const router = express.Router();
 
 const today = () => new Date().toISOString().slice(0, 10);
 
+/** Metres between two coordinates (haversine). */
+function distanceBetween(a, b) {
+  if (!a || !b || a.lat == null || a.lng == null || b.lat == null || b.lng == null) return null;
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const earthRadius = 6371000;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return Math.round(earthRadius * 2 * Math.asin(Math.sqrt(h)));
+}
+
+/** A signature is a small data: URL drawn on the phone. Cap it so the store stays sane. */
+const MAX_SIGNATURE_BYTES = 64 * 1024;
+
+function cleanSignature(value) {
+  if (typeof value !== 'string' || value === '') return '';
+  if (!value.startsWith('data:image/png;base64,')) return '';
+  return value.length > MAX_SIGNATURE_BYTES ? '' : value;
+}
+
 function scope(req, rows) {
   const allowed = new Set(visibleUserIds(req.user));
   let out = rows.filter((r) => allowed.has(r.userId));
@@ -61,7 +83,7 @@ router.get('/orders/:id', (req, res) => {
 });
 
 router.post('/orders', (req, res) => {
-  const { customerId, type = 'order', date, note, lines, status } = req.body || {};
+  const { customerId, type = 'order', date, note, lines, status, signature, signedBy } = req.body || {};
   const customer = db().customers.find((c) => c.id === Number(customerId));
   if (!customer) return res.status(400).json({ error: 'Choose a customer' });
   const normalised = normaliseLines(lines);
@@ -78,6 +100,8 @@ router.post('/orders', (req, res) => {
     total: Number(normalised.reduce((sum, l) => sum + lineTotal(l), 0).toFixed(2)),
     status: status === 'pending' ? 'pending' : 'confirmed',
     note: note || '',
+    signature: cleanSignature(signature),
+    signedBy: signature ? String(signedBy || '').slice(0, 80) : '',
   });
   res.status(201).json(record);
 });
@@ -174,5 +198,41 @@ for (const [name, config] of Object.entries(simpleCollections)) {
     res.status(204).end();
   });
 }
+
+/**
+ * Check in at a visit. The rep's phone sends its coordinates; the server
+ * records them with the distance to the customer, so a team leader can see a
+ * visit was made on site rather than from the car park across town.
+ */
+router.post('/visits/:id/checkin', (req, res) => {
+  const visit = db().visits.find((v) => v.id === Number(req.params.id));
+  if (!visit || visit.userId !== req.user.id) {
+    return res.status(404).json({ error: 'Visit not found' });
+  }
+  if (visit.status === 'done') {
+    return res.status(409).json({ error: 'This visit is already checked in' });
+  }
+
+  const { lat, lng, accuracy } = req.body || {};
+  const customer = db().customers.find((c) => c.id === visit.customerId);
+  const position =
+    Number.isFinite(Number(lat)) && Number.isFinite(Number(lng))
+      ? { lat: Number(lat), lng: Number(lng) }
+      : null;
+  const distance = distanceBetween(position, customer);
+
+  res.json(
+    update('visits', visit.id, {
+      status: 'done',
+      checkedInAt: new Date().toISOString(),
+      lat: position?.lat ?? null,
+      lng: position?.lng ?? null,
+      accuracy: accuracy != null ? Math.round(Number(accuracy)) : null,
+      distanceM: distance,
+      // Within 250m of the recorded address counts as on-site.
+      verified: distance != null && distance <= 250,
+    }),
+  );
+});
 
 export default router;

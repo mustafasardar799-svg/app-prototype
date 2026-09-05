@@ -8,3 +8,12 @@ createRoot(document.getElementById('root')!).render(
     <App />
   </StrictMode>,
 );
+
+// Offline shell. Only in production — in dev the SW would serve stale bundles.
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {
+      // An unavailable service worker only costs offline launch; the app still runs.
+    });
+  });
+}

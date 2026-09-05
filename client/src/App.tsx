@@ -1,6 +1,9 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth, isManagerial } from './lib/auth';
-import { Spinner } from './components/Layout';
+import { ThemeProvider } from './lib/theme';
+import { ConnectionProvider } from './lib/connection';
+import { ToastProvider } from './components/Toast';
+import { Skeleton } from './components/Layout';
 import Login from './pages/Login';
 import Home from './pages/Home';
 import Orders from './pages/Orders';
@@ -8,6 +11,7 @@ import OrderForm from './pages/OrderForm';
 import OrderDetail from './pages/OrderDetail';
 import Report from './pages/Report';
 import Team from './pages/Team';
+import Leaderboard from './pages/Leaderboard';
 import Customers from './pages/Customers';
 import Profile from './pages/Profile';
 import Promotions from './pages/Promotions';
@@ -20,7 +24,9 @@ function Shell() {
   if (loading) {
     return (
       <div className="phone">
-        <Spinner />
+        <div className="page">
+          <Skeleton height={90} count={4} />
+        </div>
       </div>
     );
   }
@@ -40,6 +46,7 @@ function Shell() {
       <Route path="/orders/new" element={<OrderForm />} />
       <Route path="/orders/:id" element={<OrderDetail />} />
       <Route path="/report" element={<Report />} />
+      <Route path="/leaderboard" element={<Leaderboard />} />
       <Route path="/customers" element={<Customers />} />
       <Route path="/expenses" element={<Expenses />} />
       <Route path="/collections" element={<Collections />} />
@@ -56,10 +63,16 @@ function Shell() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <Shell />
-      </AuthProvider>
-    </BrowserRouter>
+    <ThemeProvider>
+      <ToastProvider>
+        <BrowserRouter>
+          <AuthProvider>
+            <ConnectionProvider>
+              <Shell />
+            </ConnectionProvider>
+          </AuthProvider>
+        </BrowserRouter>
+      </ToastProvider>
+    </ThemeProvider>
   );
 }

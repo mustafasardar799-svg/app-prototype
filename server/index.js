@@ -96,6 +96,26 @@ app.delete('/api/me', (req, res) => {
   res.status(204).end();
 });
 
+/**
+ * Set a staff member's monthly sales target. Managers set anyone's; a team
+ * leader only their own reports'.
+ */
+app.put('/api/users/:id/target', (req, res) => {
+  if (req.user.role === 'rep') {
+    return res.status(403).json({ error: 'Only managers and team leaders set targets' });
+  }
+  const target = db().users.find((u) => u.id === Number(req.params.id) && !u.deleted);
+  if (!target) return res.status(404).json({ error: 'Staff member not found' });
+  if (req.user.role === 'supervisor' && target.supervisorId !== req.user.id) {
+    return res.status(403).json({ error: 'That staff member does not report to you' });
+  }
+  const value = Number(req.body?.target);
+  if (!Number.isFinite(value) || value < 0) {
+    return res.status(400).json({ error: 'Target must be zero or more' });
+  }
+  res.json(publicUser(update('users', target.id, { target: Math.round(value) })));
+});
+
 app.use('/api', catalogRoutes);
 app.use('/api', recordRoutes);
 app.use('/api', reportRoutes);

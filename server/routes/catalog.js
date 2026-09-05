@@ -27,7 +27,7 @@ router.get('/customers', (req, res) => {
 });
 
 router.post('/customers', (req, res) => {
-  const { name, type, zoneId, phone, address } = req.body || {};
+  const { name, type, zoneId, phone, address, lat, lng } = req.body || {};
   if (!name || !type) return res.status(400).json({ error: 'Name and type are required' });
   res.status(201).json(
     insert('customers', {
@@ -37,6 +37,8 @@ router.post('/customers', (req, res) => {
       phone: phone || '',
       address: address || '',
       ownerId: req.user.id,
+      lat: Number.isFinite(Number(lat)) ? Number(lat) : null,
+      lng: Number.isFinite(Number(lng)) ? Number(lng) : null,
     }),
   );
 });
@@ -45,7 +47,7 @@ router.put('/customers/:id', (req, res) => {
   const allowed = new Set(visibleUserIds(req.user));
   const customer = db().customers.find((c) => c.id === Number(req.params.id));
   if (!customer || !allowed.has(customer.ownerId)) return res.status(404).json({ error: 'Customer not found' });
-  const { name, type, zoneId, phone, address } = req.body || {};
+  const { name, type, zoneId, phone, address, lat, lng } = req.body || {};
   res.json(
     update('customers', customer.id, {
       ...(name !== undefined && { name }),
@@ -53,6 +55,8 @@ router.put('/customers/:id', (req, res) => {
       ...(zoneId !== undefined && { zoneId: Number(zoneId) }),
       ...(phone !== undefined && { phone }),
       ...(address !== undefined && { address }),
+      ...(lat !== undefined && { lat: Number.isFinite(Number(lat)) ? Number(lat) : null }),
+      ...(lng !== undefined && { lng: Number.isFinite(Number(lng)) ? Number(lng) : null }),
     }),
   );
 });

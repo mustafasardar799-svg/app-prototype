@@ -3,10 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { api, type Dashboard } from '../lib/api';
 import { useAuth, isManagerial } from '../lib/auth';
 import { money, monthLabel, shortDate } from '../lib/format';
-import { Screen, Spinner } from '../components/Layout';
+import { Empty, Screen, Skeleton } from '../components/Layout';
+import { Meter, TrendChart } from '../components/Charts';
+import { InstallHint } from '../components/InstallHint';
 import {
-  IconArrow, IconBonus, IconCalendar, IconChart, IconExpense, IconMoney,
-  IconOrder, IconPhone, IconReturn, IconTag, IconUsers,
+  IconArrow, IconBonus, IconCalendar, IconExpense, IconMoney, IconOrder, IconPhone,
+  IconPin, IconReturn, IconTag, IconTrophy, IconUsers,
 } from '../components/Icons';
 
 export default function Home() {
@@ -32,25 +34,43 @@ export default function Home() {
     { label: 'Call', icon: <IconPhone />, to: '/calls' },
     isManagerial(user)
       ? { label: 'Team', icon: <IconUsers />, to: '/team' }
-      : { label: 'Customers', icon: <IconUsers />, to: '/customers' },
+      : { label: 'Ranking', icon: <IconTrophy />, to: '/leaderboard' },
   ];
 
   return (
     <Screen title="EliaVit">
       {error && <div className="alert error">{error}</div>}
-      {!data && !error && <Spinner />}
+      {!data && !error && (
+        <>
+          <div className="skeleton" style={{ height: 168, borderRadius: 22 }} />
+          <div style={{ height: 18 }} />
+          <Skeleton height={78} count={2} />
+        </>
+      )}
 
       {data && (
         <>
+          <InstallHint />
+
           <section className="hero">
             <div className="hero-head">
-              <span className="muted">{monthLabel(data.month)}</span>
+              <span className="label">{monthLabel(data.month)}</span>
               <strong>Sales Report</strong>
             </div>
-            <div className="hero-amount">
-              <div className="value">
-                {new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(data.netTotal)}
-                <span>{currency}</span>
+            <div className="hero-figure">
+              {new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(data.netTotal)}
+              <span>{currency}</span>
+            </div>
+            <div className="hero-foot">
+              <div style={{ flex: 1 }}>
+                <Meter
+                  label="Monthly target"
+                  value={data.netTotal}
+                  target={data.target}
+                  currency={currency}
+                  pace={data.pace}
+                  onHero
+                />
               </div>
               <button className="hero-go" onClick={() => navigate('/report')} aria-label="Open sales report">
                 <IconArrow size={18} />
@@ -58,13 +78,21 @@ export default function Home() {
             </div>
           </section>
 
+          <div className="section-title">
+            Last 6 months
+            <button className="link" onClick={() => navigate('/report')}>Report</button>
+          </div>
+          <div className="card">
+            <TrendChart data={data.trend} currency={currency} />
+          </div>
+
           <div className="section-title">This month</div>
           <div className="stat-strip">
-            <StatCard label="Order" count={data.counts.orders} icon={<IconOrder size={20} />} onClick={() => navigate('/orders?type=order')} />
-            <StatCard label="Return" count={data.counts.returns} icon={<IconReturn size={20} />} onClick={() => navigate('/orders?type=return')} />
-            <StatCard label="Expense" count={data.counts.expenses} icon={<IconExpense size={20} />} onClick={() => navigate('/expenses')} />
-            <StatCard label="M.C" count={data.counts.collections} icon={<IconMoney size={20} />} onClick={() => navigate('/collections')} />
-            <StatCard label="Call" count={data.counts.calls} icon={<IconPhone size={20} />} onClick={() => navigate('/calls')} />
+            <Stat label="Order" count={data.counts.orders} icon={<IconOrder size={19} />} onClick={() => navigate('/orders?type=order')} />
+            <Stat label="Return" count={data.counts.returns} icon={<IconReturn size={19} />} onClick={() => navigate('/orders?type=return')} />
+            <Stat label="Expense" count={data.counts.expenses} icon={<IconExpense size={19} />} onClick={() => navigate('/expenses')} />
+            <Stat label="M.C" count={data.counts.collections} icon={<IconMoney size={19} />} onClick={() => navigate('/collections')} />
+            <Stat label="Call" count={data.counts.calls} icon={<IconPhone size={19} />} onClick={() => navigate('/calls')} />
           </div>
 
           <div className="section-title">Quick actions</div>
@@ -88,34 +116,44 @@ export default function Home() {
             </div>
           </div>
 
-          {data.todayVisits.length > 0 && (
-            <>
-              <div className="section-title">
-                Today&apos;s visits
-                <a href="/visits" onClick={(e) => { e.preventDefault(); navigate('/visits'); }}>See all</a>
-              </div>
-              <div className="card">
-                {data.todayVisits.slice(0, 3).map((visit, index) => (
-                  <div key={visit.id} style={{ paddingTop: index ? 12 : 0 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
-                      <strong>{visit.customer}</strong>
-                      <span className={`pill ${visit.status === 'done' ? 'done' : 'pending'}`}>{visit.status}</span>
-                    </div>
-                    <div className="muted" style={{ fontSize: 12.5, marginTop: 2 }}>
-                      {visit.note || 'No objective set'}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
+          <div className="section-title">
+            Today&apos;s visits
+            <button className="link" onClick={() => navigate('/visits')}>See all</button>
+          </div>
+          {data.todayVisits.length === 0 ? (
+            <div className="card">
+              <Empty
+                icon={<IconCalendar size={26} />}
+                headline="Nothing planned today"
+                text="Add a visit so your route is ready before you set off."
+              />
+              <button className="btn ghost" onClick={() => navigate('/visits')}>Plan a visit</button>
+            </div>
+          ) : (
+            <div className="list">
+              {data.todayVisits.slice(0, 3).map((visit) => (
+                <button key={visit.id} className="row" onClick={() => navigate('/visits')}>
+                  <span className="avatar"><IconPin size={18} /></span>
+                  <span className="grow">
+                    <span className="title">{visit.customer}</span>
+                    <span className="sub">{visit.note || 'No objective set'}</span>
+                  </span>
+                  <span className={`pill ${visit.status === 'done' ? 'good' : ''}`}>
+                    {visit.status === 'done' ? 'checked in' : 'planned'}
+                  </span>
+                </button>
+              ))}
+            </div>
           )}
 
           <div className="section-title">
             Recent activity
-            <a href="/orders" onClick={(e) => { e.preventDefault(); navigate('/orders'); }}>See all</a>
+            <button className="link" onClick={() => navigate('/orders')}>See all</button>
           </div>
           <div className="list">
-            {data.recentOrders.length === 0 && <p className="empty">Nothing recorded yet.</p>}
+            {data.recentOrders.length === 0 && (
+              <Empty icon={<IconOrder size={26} />} headline="No records yet" text="Your first order will show up here." />
+            )}
             {data.recentOrders.map((order) => (
               <button key={order.id} className="row" onClick={() => navigate(`/orders/${order.id}`)}>
                 <span className="avatar">
@@ -135,25 +173,19 @@ export default function Home() {
               </button>
             ))}
           </div>
-
-          {isManagerial(user) && (
-            <button className="btn ghost" style={{ marginTop: 16 }} onClick={() => navigate('/team')}>
-              <IconChart size={18} /> Open team activity
-            </button>
-          )}
         </>
       )}
     </Screen>
   );
 }
 
-function StatCard({
+function Stat({
   label, count, icon, onClick,
 }: { label: string; count: number; icon: React.ReactNode; onClick: () => void }) {
   return (
-    <button className="stat" onClick={onClick} style={{ border: 0, cursor: 'pointer', textAlign: 'left' }}>
+    <button className="stat" onClick={onClick}>
       <span className="top">
-        <span style={{ color: 'var(--brand-dark)' }}>{icon}</span>
+        {icon}
         <span className="badge">{count}</span>
       </span>
       <span className="label">{label}</span>

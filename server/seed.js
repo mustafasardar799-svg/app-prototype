@@ -40,38 +40,38 @@ export function seedIfEmpty() {
     {
       id: 1, username: 'manager', password, name: 'Dashty Salih',
       role: 'manager', title: 'General Sales Manager', phone: '7507777777',
-      currency: 'IQD', supervisorId: null, zoneId: null,
+      currency: 'IQD', supervisorId: null, zoneId: null, target: 0,
     },
     {
       id: 2, username: 'leader', password, name: 'Rawa Ahmed',
       role: 'supervisor', title: 'Team Leader', phone: '7501111111',
-      currency: 'IQD', supervisorId: 1, zoneId: 1,
+      currency: 'IQD', supervisorId: 1, zoneId: 1, target: 1200,
     },
     {
       id: 3, username: 'rep', password, name: 'Aland Kareem',
       role: 'rep', title: 'Medical Representative', phone: '7502222222',
-      currency: 'IQD', supervisorId: 2, zoneId: 1,
+      currency: 'IQD', supervisorId: 2, zoneId: 1, target: 900,
     },
     {
       id: 4, username: 'rep2', password, name: 'Sara Jamal',
       role: 'rep', title: 'Medical Representative', phone: '7503333333',
-      currency: 'IQD', supervisorId: 2, zoneId: 2,
+      currency: 'IQD', supervisorId: 2, zoneId: 2, target: 850,
     },
     {
       id: 5, username: 'rep3', password, name: 'Hemin Omar',
       role: 'rep', title: 'Medical Representative', phone: '7504444444',
-      currency: 'IQD', supervisorId: 1, zoneId: 3,
+      currency: 'IQD', supervisorId: 1, zoneId: 3, target: 700,
     },
   ];
 
   state.customers = [
-    { id: 1, name: 'Zanko Pharmacy', type: 'pharmacy', zoneId: 1, ownerId: 3, phone: '7509000001', address: '100m St, Erbil' },
-    { id: 2, name: 'Roj Pharmacy', type: 'pharmacy', zoneId: 1, ownerId: 3, phone: '7509000002', address: 'Bakhtiari, Erbil' },
-    { id: 3, name: 'Dr. Shwan Clinic', type: 'doctor', zoneId: 1, ownerId: 3, phone: '7509000003', address: 'Italian Village' },
-    { id: 4, name: 'Nishtiman Hospital', type: 'hospital', zoneId: 2, ownerId: 4, phone: '7509000004', address: 'Gulan St' },
-    { id: 5, name: 'Awat Pharmacy', type: 'pharmacy', zoneId: 2, ownerId: 4, phone: '7509000005', address: 'Ainkawa' },
-    { id: 6, name: 'Shar Medical Store', type: 'store', zoneId: 3, ownerId: 5, phone: '7509000006', address: 'Salim St, Sulaymaniyah' },
-    { id: 7, name: 'Kurdistan Pharmacy', type: 'pharmacy', zoneId: 3, ownerId: 5, phone: '7509000007', address: 'Bakrajo' },
+    { id: 1, name: 'Zanko Pharmacy', type: 'pharmacy', zoneId: 1, ownerId: 3, phone: '7509000001', address: '100m St, Erbil', lat: 36.1911, lng: 44.0092 },
+    { id: 2, name: 'Roj Pharmacy', type: 'pharmacy', zoneId: 1, ownerId: 3, phone: '7509000002', address: 'Bakhtiari, Erbil', lat: 36.2021, lng: 44.0181 },
+    { id: 3, name: 'Dr. Shwan Clinic', type: 'doctor', zoneId: 1, ownerId: 3, phone: '7509000003', address: 'Italian Village', lat: 36.1723, lng: 43.9564 },
+    { id: 4, name: 'Nishtiman Hospital', type: 'hospital', zoneId: 2, ownerId: 4, phone: '7509000004', address: 'Gulan St', lat: 36.2145, lng: 43.9812 },
+    { id: 5, name: 'Awat Pharmacy', type: 'pharmacy', zoneId: 2, ownerId: 4, phone: '7509000005', address: 'Ainkawa', lat: 36.2361, lng: 43.9928 },
+    { id: 6, name: 'Shar Medical Store', type: 'store', zoneId: 3, ownerId: 5, phone: '7509000006', address: 'Salim St, Sulaymaniyah', lat: 35.5556, lng: 45.4351 },
+    { id: 7, name: 'Kurdistan Pharmacy', type: 'pharmacy', zoneId: 3, ownerId: 5, phone: '7509000007', address: 'Bakrajo', lat: 35.5498, lng: 45.3702 },
   ];
 
   const line = (productId, qty, bonus = 0, discount = 0) => {
@@ -98,6 +98,38 @@ export function seedIfEmpty() {
     makeOrder(9, 4, 5, 'return', daysAgo(6), [line(8, 3)]),
     makeOrder(10, 3, 2, 'order', daysAgo(0), [line(3, 9), line(8, 7)], 'pending'),
   ];
+
+  // Six months of history so the trend chart and month-on-month figures have
+  // something real to show on a fresh deploy. Deterministic, not random, so
+  // every deploy seeds the same demo numbers.
+  const repIds = [3, 4, 5];
+  const customersByRep = { 3: [1, 2, 3], 4: [4, 5], 5: [6, 7] };
+  let historyId = state.orders.length;
+  for (let monthsBack = 5; monthsBack >= 1; monthsBack -= 1) {
+    const anchorDate = new Date();
+    anchorDate.setMonth(anchorDate.getMonth() - monthsBack, 15);
+    const monthKey = anchorDate.toISOString().slice(0, 7);
+    repIds.forEach((repId, repIndex) => {
+      const ordersThisMonth = 3 + ((monthsBack + repIndex) % 3);
+      for (let n = 0; n < ordersThisMonth; n += 1) {
+        historyId += 1;
+        const day = String(3 + ((n * 7 + repIndex * 3) % 24)).padStart(2, '0');
+        const customerIds = customersByRep[repId];
+        const productId = 1 + ((historyId * 3 + n) % state.products.length);
+        const qty = 6 + ((historyId * 5 + monthsBack) % 18);
+        state.orders.push(
+          makeOrder(
+            historyId,
+            repId,
+            customerIds[n % customerIds.length],
+            n % 7 === 6 ? 'return' : 'order',
+            `${monthKey}-${day}`,
+            [line(productId, qty), line(1 + ((productId + 2) % state.products.length), 4 + (n % 9))],
+          ),
+        );
+      }
+    });
+  }
 
   state.expenses = [
     { id: 1, userId: 3, date: daysAgo(1), category: 'Fuel', amount: 25, note: 'Erbil center route' },
